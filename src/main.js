@@ -6,13 +6,14 @@ import * as confused from "../pixelfx/fx/status/confused.js";
 import * as stunned from "../pixelfx/fx/status/stunned.js";
 import * as exclamation from "../pixelfx/fx/ui/exclamation.js";
 import { bigTree, drawTreeLights, stage as podium } from "./bigtree.js";
-import { makePopulation, renderSprite, actorFor, SW, SH } from "./characters.js";
+import { renderSprite, actorFor, SW, SH } from "./characters.js";
+import * as respawnBeam from "../pixelfx/fx/spawn/respawn-beam.js";
+import * as confetti from "../pixelfx/fx/ui/confetti.js";
+import { ALL, MAX, sortedByName, loadAttendees, saveAttendees, onJoin, avatarURL, mountJoinForm } from "./joinform.js";
 
 const W = 640, H = 360;
 const CX = W / 2, FY = 216; // 광장 중심(대형 트리)
-const MAX = 110;
 const params = new URLSearchParams(location.search);
-let COUNT = Math.min(MAX, Math.max(2, +(params.get("n") || 10)));
 
 // ---------- 화면 ----------
 const stage = document.getElementById("stage");
@@ -24,11 +25,14 @@ cv.width = W; cv.height = H;
 const img = ctx.createImageData(W, H);
 let S = 3, dpr = 1;
 function resize() {
-  const avail = Math.min((innerWidth - 16) / W, (innerHeight - 120) / H);
+  const wide = innerWidth >= 1000, side = wide ? 2 * 236 : 0;
+  document.body.classList.toggle("narrow", !wide);
+  const avail = Math.min((innerWidth - 24 - side) / W, ((wide ? innerHeight : innerHeight * 0.62) - 96) / H);
   S = Math.max(1, avail >= 2 ? Math.floor(avail) : avail);
   const cw = Math.round(W * S), ch = Math.round(H * S);
   for (const c of [cv, ov]) { c.style.width = cw + "px"; c.style.height = ch + "px"; }
   stage.style.width = cw + "px"; stage.style.height = ch + "px";
+  document.getElementById("row").style.height = wide ? ch + "px" : "";
   dpr = devicePixelRatio || 1;
   ov.width = Math.round(cw * dpr); ov.height = Math.round(ch * dpr);
 }
@@ -211,16 +215,15 @@ function drawIcon(px, py, kind, a) {
 }
 
 // ---------- 주민 ----------
-const ALL = makePopulation(MAX);
 const FX = { charmed, sleep, confused, stunned };
 
 class Resident {
-  constructor(d) {
-    this.d = d; this.name = d.name; this.style = d.style;
+  constructor(d, message = "") {
+    this.d = d; this.name = d.name; this.style = d.style; this.message = message;
     this.cache = new Map();
     this.actor = actorFor(this.sprite(0, 0, false));
     let x, y;
-    do { x = rnd(20, W - 20); y = rnd(FLOOR_TOP + 14, H - 10); } while (blocked(x, y) || people.some((o) => Math.hypot(o.x - x, o.y - y) < 18));
+    do { x = rnd(20, W - 20); y = rnd(FLOOR_TOP + 14, H - 10); } while (blocked(x, y) || (Math.abs(x - CX) < 76 && y < FY + 26 && y > FY - 140) || people.some((o) => Math.hypot(o.x - x, o.y - y) < 18));
     this.x = x; this.y = y;
     this.state = "idle"; this.timer = rnd(0.3, 3); this.dir = 0; this.flip = false; this.t = rnd(0, 9);
     this.speed = rnd(16, 26); this.blinkAt = rnd(1, 4);
@@ -241,7 +244,7 @@ class Resident {
   }
   react() {
     const r = Math.random();
-    if (r < 0.34) this.say(choose(LINES));
+    if (r < 0.34) this.say(this.message && Math.random() < 0.35 ? this.message : choose(LINES));
     else if (r < 0.62) this.pop();
     else if (r < 0.74) { this.play(exclamation, false); }
     else {
@@ -270,6 +273,15 @@ class Resident {
     if (this.icon && (this.icon.t += dt) > this.icon.dur) this.icon = null;
     if (this.speech && now > this.speech.until) this.speech = null;
     if (this.pending && now > this.pending.at) { this.say(this.pending.text); this.pending = null; }
+    if (this.entering !== undefined) {
+      this.entering += dt;
+      if (this.entering > 1.75) {
+        this.entering = undefined;
+        this.play(confetti, false);
+        if (this.message) this.say(this.message, 7);
+      }
+      return;
+    }
 
     if (this.state === "walk") {
       const dx = this.tx - this.x, dy = this.ty - this.y, d = Math.hypot(dx, dy);
@@ -293,7 +305,17 @@ class Resident {
       }
     }
   }
+  get hidden() {
+    const b = this.fx.find((f) => f.fx.meta === respawnBeam.meta);
+    return b ? respawnBeam.actorAlpha(b.fx.t) === 0 : false;
+  }
+  enter() {
+    this.state = "idle"; this.dir = 0; this.timer = 4.2;
+    this.play(respawnBeam, false);
+    this.entering = 0;
+  }
   draw() {
+    if (this.hidden) { for (const f of this.fx) f.fx.draw(frame, "back"); return; }
     const walking = this.state === "walk";
     const step = walking ? Math.floor(this.t * 7) % 4 : 0;
     const blink = !walking && this.t % this.blinkAt < 0.13;
@@ -370,6 +392,15 @@ function pixelBox(c, x, y, w, h, u, fill, ink) {
   c.fillStyle = fill;
   c.fillRect(x + u, y + u, w - 2 * u, h - 2 * u);
 }
+function wrap(c, text, maxW) {
+  if (c.measureText(text).width <= maxW) return [text];
+  const out = []; let cur = "";
+  for (const ch of [...text]) {
+    if (c.measureText(cur + ch).width > maxW && cur) { out.push(cur); cur = ch.trimStart(); } else cur += ch;
+  }
+  if (cur) out.push(cur);
+  return out.slice(0, 3);
+}
 function drawOverlay() {
   const c = octx, u = Math.max(1, Math.round(S / 1.5));
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -391,6 +422,7 @@ function drawOverlay() {
   // 이름표
   c.font = `${small}px Galmuri11, "Apple SD Gothic Neo", sans-serif`;
   for (const r of list) {
+    if (r.hidden) continue;
     const x = r.x * S, y = (r.y + 3) * S + small * 0.6;
     const tw = c.measureText(r.name).width + 8;
     c.fillStyle = "rgba(20,14,30,0.72)";
@@ -403,27 +435,83 @@ function drawOverlay() {
   for (const r of list) {
     if (!r.speech) continue;
     const x = r.x * S, top = (r.y - SH - 4) * S - (r.icon ? 14 * S : 0);
-    const tw = c.measureText(r.speech.text).width + 16, th = small * 1.9;
+    const lines = wrap(c, r.speech.text, small * 13), lh = small * 1.35;
+    const tw = Math.max(...lines.map((l) => c.measureText(l).width)) + 16, th = lh * lines.length + small * 0.6;
     const bx = Math.round(Math.min(Math.max(x - tw / 2, 4), W * S - tw - 4)), by = Math.round(top - th - 6 * u);
     pixelBox(c, bx, by, tw, th, u * 2, "#ffffff", "#1c1624");
     // 꼬리
     c.fillStyle = "#1c1624";
     c.fillRect(Math.round(x - 3 * u), by + th - u, 6 * u, 3 * u); c.fillRect(Math.round(x - u), by + th + 2 * u, 2 * u, 2 * u);
     c.fillStyle = "#ffffff"; c.fillRect(Math.round(x - 2 * u), by + th - 2 * u, 4 * u, 3 * u);
-    c.fillStyle = "#1c1624"; c.fillText(r.speech.text, bx + tw / 2, by + th / 2 + 1);
+    c.fillStyle = "#1c1624";
+    lines.forEach((l, i) => c.fillText(l, bx + tw / 2, by + th / 2 + 1 + (i - (lines.length - 1) / 2) * lh));
   }
 }
 
-// ---------- 루프 ----------
+// ---------- 참석 명단 ----------
 let people = [];
-function populate(n) {
-  COUNT = n; people = [];
-  for (let i = 0; i < n; i++) people.push(new Resident(ALL[i]));
-  // 첫 화면부터 살아 있게: 몇 명은 바로 반응
-  people.forEach((r, i) => { if (i % 3 === 0) setTimeout(() => r.react(), 300 + Math.random() * 1500); });
-  const m = people.filter((p) => p.style.gender === "M").length;
-  document.getElementById("count").textContent = `접속 ${n}명 · 남 ${m} / 여 ${n - m}`;
-  document.querySelectorAll("[data-n]").forEach((b) => b.classList.toggle("on", +b.dataset.n === n));
+const present = new Map(); // id -> { message, at }
+const $ = (q) => document.querySelector(q);
+
+function renderLists(highlight) {
+  const waiting = ALL.map((d) => d.id).filter((id) => !present.has(id));
+  const pres = [...present.entries()].sort((a, b) => b[1].at - a[1].at);
+  $("#waitN").textContent = waiting.length;
+  $("#presN").textContent = pres.length;
+  const m = pres.filter(([id]) => ALL[id].style.gender === "M").length;
+  $("#presMF").textContent = `남 ${m} · 여 ${pres.length - m}`;
+  $("#waitList").innerHTML = sortedByName(waiting).map((id) =>
+    `<li><img src="${avatarURL(id, 2, true)}" alt=""><span class="nm ${ALL[id].style.gender}">${ALL[id].name}</span></li>`).join("");
+  $("#presList").innerHTML = pres.length ? pres.map(([id, v]) =>
+    `<li class="${id === highlight ? "new" : ""}"><img src="${avatarURL(id, 2, true)}" alt=""><div><span class="nm ${ALL[id].style.gender}">${ALL[id].name}</span><p>${esc(v.message)}</p></div></li>`).join("")
+    : `<li class="empty">아직 아무도 없어요.<br>첫 번째로 입장해 보세요!</li>`;
+  form?.refresh();
+}
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+function persist() { saveAttendees([...present.entries()].map(([id, v]) => ({ id, message: v.message, at: v.at }))); }
+
+/** 입장: 이름·한마디로 광장에 등장 */
+function arrive(id, message, { silent = false, at = Date.now() } = {}) {
+  if (!(id >= 0 && id < MAX)) return;
+  message = String(message || "").slice(0, 40);
+  if (present.has(id)) {
+    // 이미 와 있으면 한마디만 갱신
+    present.get(id).message = message;
+    const r = people.find((p) => p.d.id === id);
+    if (r) { r.message = message; r.say(message, 6); }
+    persist(); renderLists(id);
+    return;
+  }
+  present.set(id, { message, at });
+  const r = new Resident(ALL[id], message);
+  people.push(r);
+  if (!silent) { r.enter(); announce(id, message); }
+  else r.timer = rnd(0.3, 3);
+  persist(); renderLists(silent ? -1 : id);
+}
+
+// 입장 알림 카드 (차례로)
+const queue = [];
+let showing = false;
+function announce(id, message) { queue.push({ id, message }); if (!showing) nextAnnounce(); }
+function nextAnnounce() {
+  const a = queue.shift();
+  const el = $("#announce");
+  if (!a) { showing = false; el.classList.remove("on"); return; }
+  showing = true;
+  el.innerHTML = `<img src="${avatarURL(a.id, 3)}" alt=""><div><b>🎉 <span class="${ALL[a.id].style.gender}">${ALL[a.id].name}</span> 님 입장!</b><p>“${esc(a.message)}”</p></div>`;
+  el.classList.remove("on"); void el.offsetWidth; el.classList.add("on");
+  setTimeout(nextAnnounce, queue.length ? 2600 : 4200);
+}
+
+const SAMPLE_MSG = ["올해 정말 고생 많으셨어요!", "내년에도 잘 부탁드립니다 🙏", "다들 건강하세요!", "올해 최고의 팀이었어요 👏", "새해 복 많이 받으세요", "맛있는 거 먹으러 왔어요 🍗", "내년엔 더 재밌게!", "올 한 해 감사했습니다", "회식 2차 갑니다 🍻", "다들 사랑합니다 ❤️"];
+function randomArrivals(n) {
+  const waiting = ALL.map((d) => d.id).filter((id) => !present.has(id));
+  for (let i = 0; i < n && waiting.length; i++) {
+    const id = waiting.splice(Math.floor(Math.random() * waiting.length), 1)[0];
+    setTimeout(() => arrive(id, choose(SAMPLE_MSG)), i * 700);
+  }
 }
 
 function chats() {
@@ -472,12 +560,40 @@ ov.addEventListener("pointerdown", (e) => {
   for (const r of people) { const d = Math.hypot(r.x - x, r.y - 12 - y); if (d < 16 && d < bd) { bd = d; best = r; } }
   if (best) best.react();
 });
-document.querySelectorAll("[data-n]").forEach((b) => b.addEventListener("click", () => populate(+b.dataset.n)));
 document.getElementById("cheers").addEventListener("click", () => {
   for (const r of people) setTimeout(() => { r.say(choose(["건배! 🥂", "위하여~!", "건배~!!", "올해도 수고했어요!"])); r.pop("cheers"); }, Math.random() * 600);
 });
 
+// 입장 팝업
+let form = null;
+const modal = $("#modal");
+function openModal() { modal.classList.add("on"); form.refresh(); setTimeout(() => form.focus(), 50); }
+function closeModal() { modal.classList.remove("on"); }
+$("#joinBtn").addEventListener("click", openModal);
+modal.addEventListener("pointerdown", (e) => { if (e.target === modal) closeModal(); });
+$("#modalClose").addEventListener("click", closeModal);
+addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+$("#rand5").addEventListener("click", () => randomArrivals(5));
+$("#reset").addEventListener("click", () => {
+  if (!confirm("참석 명단을 모두 비울까요?")) return;
+  present.clear(); people = []; persist(); renderLists();
+});
+// 다른 탭(모바일 입장 페이지)에서 온 입장
+onJoin((id, message) => arrive(id, message));
+
 buildBackground();
 buildProps();
-populate(COUNT);
+form = mountJoinForm($("#modalBody"), {
+  waiting: () => ALL.map((d) => d.id).filter((id) => !present.has(id)),
+  onSubmit: (id, message) => { arrive(id, message); setTimeout(closeModal, 500); },
+  doneText: "입장! 광장을 보세요 🎉",
+});
+for (const a of loadAttendees()) arrive(a.id, a.message, { silent: true, at: a.at || Date.now() });
+// 테스트용: ?n=30 → 랜덤 30명 바로 입장
+if (params.get("n")) {
+  const waiting = ALL.map((d) => d.id).filter((id) => !present.has(id));
+  for (let i = 0; i < Math.min(+params.get("n"), waiting.length); i++) arrive(waiting.splice(Math.floor(Math.random() * waiting.length), 1)[0], choose(SAMPLE_MSG), { silent: true });
+}
+renderLists();
+if (params.get("arrive")) setTimeout(() => randomArrivals(+params.get("arrive")), 400);
 (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(tick));
