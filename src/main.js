@@ -5,11 +5,11 @@ import * as sleep from "../pixelfx/fx/status/sleep.js";
 import * as confused from "../pixelfx/fx/status/confused.js";
 import * as stunned from "../pixelfx/fx/status/stunned.js";
 import * as exclamation from "../pixelfx/fx/ui/exclamation.js";
-import * as fountain from "../pixelfx/fx/water/fountain.js";
+import { bigTree, drawTreeLights, stage as podium } from "./bigtree.js";
 import { makePopulation, renderSprite, actorFor, SW, SH } from "./characters.js";
 
 const W = 640, H = 360;
-const CX = W / 2, FY = 206; // 광장 중심(분수대)
+const CX = W / 2, FY = 216; // 광장 중심(대형 트리)
 const MAX = 110;
 const params = new URLSearchParams(location.search);
 let COUNT = Math.min(MAX, Math.max(2, +(params.get("n") || 10)));
@@ -146,13 +146,15 @@ function addProp(spr, x, y, block, glow) {
 }
 function buildProps() {
   for (const [x, y] of [[130, 140], [510, 140], [130, 312], [510, 312]]) addProp(lampSpr, x, y, [x - 4, y - 3, x + 4, y + 2], [x, y - 38, 46, "#ffcf80", 0.45]);
-  for (const [x, y] of [[CX - 100, 78], [CX + 100, 78], [56, 200], [W - 56, 200]]) addProp(benchSpr, x, y, [x - 20, y - 6, x + 20, y + 2]);
+  for (const [x, y] of [[CX - 150, 82], [CX + 150, 82], [56, 200], [W - 56, 200]]) addProp(benchSpr, x, y, [x - 20, y - 6, x + 20, y + 2]);
   for (const [x, y] of [[36, 100], [W - 36, 100], [CX - 210, 340], [CX + 210, 340]]) addProp(treeSpr, x, y, [x - 14, y - 6, x + 14, y + 3]);
-  for (const [x, y] of [[CX - 110, 250], [CX + 110, 250], [CX - 40, 60], [CX + 40, 60], [CX, 330]]) addProp(potSpr, x, y, [x - 8, y - 4, x + 8, y + 2]);
-  // 분수대
-  blocks.push({ ell: [CX, FY - 6, 40, 22] });
+  for (const [x, y] of [[CX - 110, 262], [CX + 110, 262], [CX - 88, 108], [CX + 88, 108], [CX, 336]]) addProp(potSpr, x, y, [x - 8, y - 4, x + 8, y + 2]);
+  // 12시 방향 단상
+  addProp(podium, CX, 104, [CX - 76, 44, CX + 76, 108], [CX, 70, 60, "#fff0c0", 0.25]);
+  // 중앙 대형 트리
+  addProp(bigTree, CX, FY + 20, null);
+  blocks.push({ ell: [CX, FY + 12, 62, 16] });
 }
-const fountainFx = createFx(fountain, { x: CX, y: FY + 10, seed: 3 });
 
 function blocked(x, y) {
   if (x < 12 || x > W - 12 || y < FLOOR_TOP + 10 || y > H - 6) return true;
@@ -172,7 +174,7 @@ function clearPath(x0, y0, x1, y1) {
 // ---------- 대사 ----------
 const LINES = [
   "올해 고생 많으셨어요!", "건배~! 🥂", "내년에도 잘 부탁해요", "벌써 연말이라니…", "케이크 어디 있어요?",
-  "사진 같이 찍어요!", "올해 최고의 순간은?", "경품 추첨 언제 해요?", "와 분수 예쁘다", "다들 한 해 수고했어요 👏",
+  "사진 같이 찍어요!", "올해 최고의 순간은?", "경품 추첨 언제 해요?", "와 트리 진짜 크다 🎄", "단상에서 한마디 하실 분?", "다들 한 해 수고했어요 👏",
   "2차 가실 분~?", "이 노래 좋다 ♪", "새해 복 많이 받으세요!", "올해 목표 이뤘어요?", "배고파요 🍗",
   "오늘 드레스코드 레드!", "내년엔 더 잘될 거예요", "ㅋㅋㅋㅋㅋ", "소원 빌었어요 ✨", "선물 교환 하죠!",
 ];
@@ -446,16 +448,14 @@ function tick(nowMs) {
   const now = nowMs / 1000;
   for (const r of people) r.update(dt, now);
   chats();
-  fountainFx.update(dt);
 
   frame.color.fill(0); frame.light.set(staticLight);
   drawGarland(now);
-  const items = [...people.map((r) => ({ y: r.y, r })), ...props.map((p) => ({ y: p.y, p })), { y: FY + 10, f: true }];
+  const items = [...people.map((r) => ({ y: r.y, r })), ...props.map((p) => ({ y: p.y, p }))];
   items.sort((a, b) => a.y - b.y);
   for (const it of items) {
     if (it.r) it.r.draw();
-    else if (it.p) blitProp(it.p);
-    else fountainFx.draw(frame);
+    else if (it.p) { blitProp(it.p); if (it.p.spr === bigTree) drawTreeLights(painterFor(frame), it.p.x, it.p.y, now); }
   }
   for (const it of items) if (it.r) it.r.drawFront();
   drawSnow(dt, now);
