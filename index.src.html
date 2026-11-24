@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2026 송년회 광장</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css">
+<style>
+  :root { --bg: #110d18; --ink: #f4eefc; --dim: #9a90b0; --accent: #ffd84a; --red: #b8332f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: Galmuri11, "Apple SD Gothic Neo", sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 8px; overflow: hidden; }
+  #stage { position: relative; box-shadow: 0 0 0 3px #1c1624, 0 0 0 6px #3a2f52, 0 20px 60px #000a; }
+  #stage canvas { position: absolute; inset: 0; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #overlay { cursor: pointer; }
+  .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; font-size: 13px; }
+  #count { color: var(--dim); margin-right: 8px; }
+  button { font: inherit; font-size: 13px; color: var(--ink); background: #2a2140; border: 2px solid #4a3f6a; padding: 6px 12px; cursor: pointer; box-shadow: 0 3px 0 #0008; }
+  button:hover { background: #3a2f58; }
+  button.on { background: var(--accent); color: #1c1624; border-color: #fff3b0; }
+  button#cheers { background: var(--red); border-color: #ff7a6a; }
+  .hint { color: var(--dim); font-size: 11px; }
+</style>
+</head>
+<body>
+  <div id="stage"><canvas id="world"></canvas><canvas id="overlay"></canvas></div>
+  <div class="bar">
+    <span id="count">접속 10명</span>
+    <button data-n="10">10명</button>
+    <button data-n="30">30명</button>
+    <button data-n="110">110명</button>
+    <button id="cheers">🥂 다 같이 건배</button>
+  </div>
+  <div class="hint">캐릭터를 클릭하면 반응해요 · pixel effects by pixelfx (MIT)</div>
+  <script type="module">/*BUNDLE*/</script>
+</body>
+</html>
