@@ -8,7 +8,8 @@ import * as exclamation from "../pixelfx/fx/ui/exclamation.js";
 import * as fountain from "../pixelfx/fx/water/fountain.js";
 import { makePopulation, renderSprite, actorFor, SW, SH } from "./characters.js";
 
-const W = 480, H = 270;
+const W = 640, H = 360;
+const CX = W / 2, FY = 206; // 광장 중심(분수대)
 const MAX = 110;
 const params = new URLSearchParams(location.search);
 let COUNT = Math.min(MAX, Math.max(2, +(params.get("n") || 10)));
@@ -50,7 +51,7 @@ function buildBackground() {
   for (let y = 2; y < FLOOR_TOP - 6; y += 5) for (let x = (y / 5) % 2 ? 0 : 6; x < W; x += 12) p.rect(x, y, 11, 1, C("#2b2440"));
   // 창문
   for (let x = 18; x < W; x += 54) {
-    if (x > 200 && x < 270) continue;
+    if (x > CX - 40 && x < CX + 30) continue;
     p.rect(x - 1, 7, 24, 20, C("#15111f"));
     p.rect(x, 8, 22, 18, C("#f2b45c"));
     p.rect(x, 8, 22, 4, C("#ffd88a"));
@@ -60,11 +61,11 @@ function buildBackground() {
     p.glow(x + 11, 18, 22, C("#ffb35a"), 0.22);
   }
   // 중앙 출입문
-  p.rect(222, 6, 36, FLOOR_TOP - 6, C("#15111f"));
-  p.rect(224, 8, 32, FLOOR_TOP - 8, C("#5a3a2a"));
-  p.rect(239, 8, 2, FLOOR_TOP - 8, C("#3a2418"));
-  p.rect(226, 10, 11, 14, C("#f7c66b")); p.rect(243, 10, 11, 14, C("#f7c66b"));
-  p.glow(240, 20, 30, C("#ffb35a"), 0.3);
+  p.rect(CX - 18, 6, 36, FLOOR_TOP - 6, C("#15111f"));
+  p.rect(CX - 16, 8, 32, FLOOR_TOP - 8, C("#5a3a2a"));
+  p.rect(CX - 1, 8, 2, FLOOR_TOP - 8, C("#3a2418"));
+  p.rect(CX - 14, 10, 11, 14, C("#f7c66b")); p.rect(CX + 3, 10, 11, 14, C("#f7c66b"));
+  p.glow(CX, 20, 30, C("#ffb35a"), 0.3);
   // 보도 턱
   p.rect(0, FLOOR_TOP - 4, W, 4, C("#4b445e"));
   p.rect(0, FLOOR_TOP - 4, W, 1, C("#6a6382"));
@@ -73,9 +74,9 @@ function buildBackground() {
     for (let x = 0; x < W; x++) {
       const tx = Math.floor((x + (Math.floor((y - FLOOR_TOP) / 12) % 2) * 8) / 16), ty = Math.floor((y - FLOOR_TOP) / 12);
       const gx = (x + (ty % 2) * 8) % 16, gy = (y - FLOOR_TOP) % 12;
-      const dx = x - 240, dy = (y - 158) * 1.9, d = Math.hypot(dx, dy);
+      const dx = x - CX, dy = (y - FY) * 1.9, d = Math.hypot(dx, dy);
       let c;
-      if (d < 92 && d > 80) c = (Math.floor(Math.atan2(dy, dx) * 8) % 2 ? "#4f5672" : "#4a516c");
+      if (d < 104 && d > 92) c = (Math.floor(Math.atan2(dy, dx) * 8) % 2 ? "#4f5672" : "#4a516c");
       else c = hash2(tx, ty) < 0.5 ? "#373c52" : "#3a4058";
       if (gx === 0 || gy === 0) c = "#2a2d3f";
       else if (hash2(x, y) < 0.025) c = "#434a64";
@@ -83,7 +84,7 @@ function buildBackground() {
     }
   // 잔디 화단 (아래 양 모서리)
   for (const [cx, sx] of [[0, 1], [W, -1]])
-    for (let y = 214; y < H; y++)
+    for (let y = H - 60; y < H; y++)
       for (let x = 0; x < 70; x++) {
         const px = cx === 0 ? x : W - 1 - x;
         if (x + (H - y) * 1.1 > 92) continue;
@@ -144,14 +145,14 @@ function addProp(spr, x, y, block, glow) {
   }
 }
 function buildProps() {
-  for (const [x, y] of [[96, 112], [384, 112], [96, 236], [384, 236]]) addProp(lampSpr, x, y, [x - 4, y - 3, x + 4, y + 2], [x, y - 38, 46, "#ffcf80", 0.45]);
-  for (const [x, y] of [[160, 74], [320, 74]]) addProp(benchSpr, x, y, [x - 20, y - 6, x + 20, y + 2]);
-  for (const [x, y] of [[34, 98], [446, 98]]) addProp(treeSpr, x, y, [x - 14, y - 6, x + 14, y + 3]);
-  for (const [x, y] of [[136, 186], [344, 186], [200, 60], [280, 60]]) addProp(potSpr, x, y, [x - 8, y - 4, x + 8, y + 2]);
+  for (const [x, y] of [[130, 140], [510, 140], [130, 312], [510, 312]]) addProp(lampSpr, x, y, [x - 4, y - 3, x + 4, y + 2], [x, y - 38, 46, "#ffcf80", 0.45]);
+  for (const [x, y] of [[CX - 100, 78], [CX + 100, 78], [56, 200], [W - 56, 200]]) addProp(benchSpr, x, y, [x - 20, y - 6, x + 20, y + 2]);
+  for (const [x, y] of [[36, 100], [W - 36, 100], [CX - 210, 340], [CX + 210, 340]]) addProp(treeSpr, x, y, [x - 14, y - 6, x + 14, y + 3]);
+  for (const [x, y] of [[CX - 110, 250], [CX + 110, 250], [CX - 40, 60], [CX + 40, 60], [CX, 330]]) addProp(potSpr, x, y, [x - 8, y - 4, x + 8, y + 2]);
   // 분수대
-  blocks.push({ ell: [240, 152, 40, 22] });
+  blocks.push({ ell: [CX, FY - 6, 40, 22] });
 }
-const fountainFx = createFx(fountain, { x: 240, y: 168, seed: 3 });
+const fountainFx = createFx(fountain, { x: CX, y: FY + 10, seed: 3 });
 
 function blocked(x, y) {
   if (x < 12 || x > W - 12 || y < FLOOR_TOP + 10 || y > H - 6) return true;
@@ -372,12 +373,12 @@ function drawOverlay() {
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
   c.clearRect(0, 0, ov.width, ov.height);
   c.textAlign = "center"; c.textBaseline = "middle";
-  const big = S >= 4 ? 22 : S >= 2.5 ? 15 : 11;
-  const small = S >= 4 ? 15 : S >= 2.5 ? 12 : 10;
+  const big = S >= 4 ? 22 : S >= 2 ? 15 : 11;
+  const small = S >= 4 ? 15 : S >= 2 ? 11 : 10;
 
   // 현수막
   {
-    const cx = 240 * S, cy = 30 * S;
+    const cx = CX * S, cy = 30 * S;
     c.font = `bold ${big}px Galmuri11, "Apple SD Gothic Neo", sans-serif`;
     const t = "🎉 2026 U PLEAT 송년회 🎉", tw = c.measureText(t).width + 24;
     pixelBox(c, cx - tw / 2, cy - big * 0.9, tw, big * 1.8, u * 2, "#b8332f", "#1c1624");
@@ -449,7 +450,7 @@ function tick(nowMs) {
 
   frame.color.fill(0); frame.light.set(staticLight);
   drawGarland(now);
-  const items = [...people.map((r) => ({ y: r.y, r })), ...props.map((p) => ({ y: p.y, p })), { y: 168, f: true }];
+  const items = [...people.map((r) => ({ y: r.y, r })), ...props.map((p) => ({ y: p.y, p })), { y: FY + 10, f: true }];
   items.sort((a, b) => a.y - b.y);
   for (const it of items) {
     if (it.r) it.r.draw();
