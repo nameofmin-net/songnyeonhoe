@@ -36,7 +36,8 @@
   .panel.chat ul { padding: 8px; }
   .panel.chat h2 .cnt { font-size: 11px; color: var(--dim); }
   .panel.chat .sub { border-bottom: 0; border-top: 2px solid var(--line); text-align: center; }
-  .panel .qr { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-top: 2px solid var(--line); background: #2a2140; flex: none; }
+  .col .panel.qrbox { flex: none; }
+  .panel .qr { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: #2a2140; }
   .panel .qr img { width: 64px; height: 64px; background: #fff; padding: 3px; flex: none; image-rendering: pixelated; }
   .panel .qr span { font-size: 11px; color: #d8cfe8; line-height: 1.5; }
   .panel .qr b { display: block; font-size: 15px; color: var(--accent); margin-bottom: 2px; animation: qrb 1.6s ease-in-out infinite; }
@@ -88,10 +89,12 @@
         <div class="sub" id="presMF">남 0 · 여 0</div>
         <ul id="presList" class="auto"></ul>
       </section>
+      <section class="panel qrbox">
+        <div class="qr"><img src="qr.svg" alt="입장 QR"><span><b>QR 찍고 입장!</b>휴대폰으로 찍으면<br>광장에 내 캐릭터 등장</span></div>
+      </section>
       <section class="panel wait">
         <h2>아직 도착 전 <b id="waitN">0</b></h2>
         <ul id="waitList" class="auto"></ul>
-        <div class="qr"><img src="qr.svg" alt="입장 QR"><span><b>QR 찍고 입장!</b>휴대폰으로 찍으면<br>광장에 내 캐릭터 등장</span></div>
       </section>
     </div>
     <div id="stage">
