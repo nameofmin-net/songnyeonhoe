@@ -1,5 +1,5 @@
 // 송년회 메타버스 광장 — pixelfx 기반
-import { createFrame, createFx, composite, painterFor, hex, rgb } from "../pixelfx/core/index.js";
+import { createFrame, createFx, composite, painterFor, hex, rgb, sparkle } from "../pixelfx/core/index.js";
 import * as charmed from "../pixelfx/fx/status/charmed.js";
 import * as sleep from "../pixelfx/fx/status/sleep.js";
 import * as confused from "../pixelfx/fx/status/confused.js";
@@ -378,6 +378,7 @@ class Resident {
     for (const f of this.fx) f.fx.draw(frame, "back");
     if (this.spo) drawSpecial(painterFor(frame), this.style.sp, "back", this.spo);
     blit(spr, SW, SH, x0, y0, this.flip);
+    this.last = { spr, x0, y0, flip: this.flip };
   }
   drawFront() {
     if (this.spo && !this.hidden) drawSpecial(painterFor(frame), this.style.sp, "front", this.spo);
@@ -402,9 +403,9 @@ function blit(spr, w, h, x0, y0, flip) {
     }
   }
 }
-function blitProp(pr) {
+function blitProp(pr, fromRow = 0) {
   const s = pr.spr, x0 = pr.x - s.ox, y0 = pr.y - s.oy;
-  for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) {
+  for (let y = fromRow; y < s.h; y++) for (let x = 0; x < s.w; x++) {
     const c = s.color[y * s.w + x];
     if (!c) continue;
     const sx = x0 + x, sy = y0 + y;
@@ -597,6 +598,8 @@ function arrive(id, message, { silent = false, at = Date.now() } = {}) {
   renderLists(silent ? -1 : id);
 }
 function leave(id) {
+  const r = people.find((p) => p.d.id === id);
+  if (r && r.last && !r.hidden) dissolve(r);
   present.delete(id);
   people = people.filter((p) => p.d.id !== id);
 }
@@ -666,14 +669,17 @@ function tick(nowMs) {
     if (it.r) it.r.draw();
     else if (it.p) {
       if (it.p.spr === bigTree) {
-        if (!treeVisible()) continue;
+        const from = treeFromRow();
+        if (from >= bigTree.h) continue;
         const sx = tree.shake > 0 ? Math.round(Math.sin(tree.shake * 60)) : 0, pp = sx ? { ...it.p, x: it.p.x + sx } : it.p;
-        blitProp(pp); drawTreeLights(painterFor(frame), pp.x, pp.y, now);
+        if (from > 0) blitProp(pp, from);
+        else { blitProp(pp); drawTreeLights(painterFor(frame), pp.x, pp.y, now); }
       } else blitProp(it.p);
     }
   }
   for (const it of items) if (it.r) it.r.drawFront();
   drawTreeFx(dt);
+  drawDust(dt);
   drawSnow(dt, now);
   composite(frame, img.data, bg);
   ctx.putImageData(img, 0, 0);
@@ -686,7 +692,7 @@ const ADMIN_KEY_LS = "songnyeonhoe-admin";
 const savedKey = () => { try { return localStorage.getItem(ADMIN_KEY_LS) || ""; } catch { return ""; } };
 const saveKey = (k) => { try { k ? localStorage.setItem(ADMIN_KEY_LS, k) : localStorage.removeItem(ADMIN_KEY_LS); } catch {} };
 const TAPS_NEEDED = 30, TAP_WINDOW = 9000;
-const tree = { taps: [], shake: 0, boom: -1, bits: [], sparks: [] };
+const tree = { taps: [], shake: 0, boom: -1, bits: [], sparks: [], dust: [] };
 const treeProp = () => props.find((p) => p.spr === bigTree);
 function hitTree(x, y) {
   const p = treeProp(); if (!p) return false;
@@ -755,16 +761,56 @@ function drawTreeFx(dt) {
     if (t.big) p.dot(Math.round(t.x) + 1, Math.round(t.y), t.c, a), p.dot(Math.round(t.x), Math.round(t.y) + 1, t.c, a);
     if (t.glow) p.light(t.x, t.y, t.c, 0.6 * a);
   }
-  // 다시 자라나는 트리: 반짝이 기둥
-  if (b > 2.6 && b < 3.4) { const u = (b - 2.6) / 0.8; p.glow(cx, cy, 30, C("#5ae08a"), 0.5 * Math.sin(u * Math.PI)); }
-  if (b > 3.4) { tree.boom = -1; tree.bits = []; }
+  // 다시 자라나는 트리: 아래에서 위로 반짝이 띠가 훑고 올라가며 생긴다
+  const g = growOf(b);
+  if (g > 0 && g < 1) {
+    const s = tp.spr, row = Math.floor(s.h * (1 - g)), wy = tp.y - s.oy + row;
+    const xs = [];
+    for (let x = 0; x < s.w; x++) for (let dy = 0; dy < 3; dy++) if (s.color[Math.min(s.h - 1, row + dy) * s.w + x]) { xs.push(x); break; }
+    if (xs.length) {
+      const x0 = tp.x - s.ox + xs[0], x1 = tp.x - s.ox + xs[xs.length - 1];
+      for (let x = x0 - 1; x <= x1 + 1; x++) { p.dot(x, wy, C("#fff3c0"), 0.9); p.light(x, wy, C("#ffd84a"), 0.5); p.light(x, wy - 1, C("#5ae08a"), 0.25); }
+      for (let i = 0; i < 4; i++) { const x = x0 + Math.random() * (x1 - x0); sparkle(p, x, wy - Math.random() * 4, 1 + Math.round(Math.random() * 2), C("#ffffff"), C("#ffd84a"), 0.3); }
+    }
+    for (let i = 0; i < 3; i++) tree.dust.push({ x: tp.x + (Math.random() - 0.5) * 70 * (1 - g * 0.8), y: wy, vx: (Math.random() - 0.5) * 20, vy: -20 - Math.random() * 30, c: [C("#ffd84a"), C("#5ae08a"), C("#fff3c0"), C("#ff8ad8")][i], life: 0.6 + Math.random() * 0.5, t: 0, sp: true });
+  }
+  if (b > GROW_AT + GROW_DUR && b < GROW_AT + GROW_DUR + 0.6) { const u = (b - GROW_AT - GROW_DUR) / 0.6; p.glow(cx, tp.y - tp.spr.oy + 4, 18, C("#ffd84a"), 0.7 * (1 - u)); if (u < 0.3) sparkle(p, cx, tp.y - tp.spr.oy + 4, 6, C("#ffffff"), C("#ffd84a"), 0.4); }
+  if (b > GROW_AT + GROW_DUR + 0.6) { tree.boom = -1; tree.bits = []; }
+}
+const GROW_AT = 2.4, GROW_DUR = 1.8;
+const growOf = (b) => (b < GROW_AT ? 0 : Math.min(1, (b - GROW_AT) / GROW_DUR));
+// 사람이 가루가 되어 흩어진다(위에서부터 부서져 오른쪽 위로 날림)
+function dissolve(r) {
+  const { spr, x0, y0, flip } = r.last;
+  const pal = [C("#c8bca8"), C("#8a8070"), C("#e8dcc8")];
+  for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
+    const c = spr[y * SW + (flip ? SW - 1 - x : x)];
+    if (!c) continue;
+    const delay = (y / SH) * 0.9 + Math.random() * 0.5 + (x / SW) * 0.15;
+    tree.dust.push({ x: x0 + x, y: y0 + y, vx: 14 + Math.random() * 30, vy: -8 - Math.random() * 22, c, ash: pal[(x + y) % 3], life: 0.9 + Math.random() * 0.8, t: -delay });
+  }
+}
+function drawDust(dt) {
+  if (!tree.dust.length) return;
+  const p = painterFor(frame);
+  for (const d of tree.dust) {
+    d.t += dt;
+    if (d.t < 0) { p.dot(d.x, d.y, d.c); continue; } // 아직 붙어 있음
+    d.x += d.vx * dt; d.y += d.vy * dt; d.vx += (Math.random() - 0.3) * 30 * dt; d.vy -= 6 * dt;
+    const u = d.t / d.life, a = Math.max(0, 1 - u);
+    const col = d.sp ? d.c : u < 0.25 ? d.c : d.ash;
+    p.dot(Math.round(d.x), Math.round(d.y), col, a);
+    if (d.sp) p.light(d.x, d.y, d.c, 0.3 * a);
+  }
+  tree.dust = tree.dust.filter((d) => d.t < d.life);
 }
 function sparkleAt(p, x, y, u, n) {
   const a = 1 - u, r = 2 + u * 6, c = n >= TAPS_NEEDED - 8 ? C("#ff5a5a") : C("#fff3c0");
   for (let i = 0; i < 6; i++) { const an = (i / 6) * Math.PI * 2; p.dot(Math.round(x + Math.cos(an) * r), Math.round(y + Math.sin(an) * r), c, a); }
   p.glow(x, y, 6, c, 0.4 * a);
 }
-const treeVisible = () => tree.boom < 0 || tree.boom > 3.0;
+// 트리 행 중 보이는 시작 줄(0 = 전부, h = 안 보임)
+const treeFromRow = () => (tree.boom < 0 ? 0 : Math.ceil(bigTree.h * (1 - growOf(tree.boom))));
 
 // 클릭 → 그 사람이 반응
 ov.addEventListener("pointerdown", (e) => {
@@ -864,5 +910,5 @@ connectLive({
 renderLists();
 if (params.get("arrive")) setTimeout(() => randomArrivals(+params.get("arrive"), true), 400);
 // 테스트용(서버에 아무것도 보내지 않음): ?debug 로 열면 콘솔에서 광장 캐릭터를 직접 움직일 수 있다
-if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride };
+if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride, explode: () => explodeTree(), leaveAll: () => { for (const id of [...present.keys()]) leave(id); } };
 (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(tick));
