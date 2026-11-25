@@ -464,6 +464,7 @@ function drawOverlay() {
   c.textAlign = "center"; c.textBaseline = "middle";
   const big = S >= 4 ? 22 : S >= 2 ? 15 : 11;
   const small = S >= 4 ? 15 : S >= 2 ? 11 : 10;
+  const nameF = Math.round(small * 1.3), talkF = Math.round(small * 1.5);
 
   // 현수막
   {
@@ -476,23 +477,23 @@ function drawOverlay() {
 
   const list = [...people].sort((a, b) => a.y - b.y);
   // 이름표
-  c.font = `${small}px Galmuri11, "Apple SD Gothic Neo", sans-serif`;
+  c.font = `${nameF}px Galmuri11, "Apple SD Gothic Neo", sans-serif`;
   for (const r of list) {
     if (r.hidden || r.state === "ride") continue;
-    const x = r.x * S, y = (r.y + 3) * S + small * 0.6;
-    const tw = c.measureText(r.name).width + 8;
+    const x = r.x * S, y = (r.y + 3) * S + nameF * 0.6;
+    const tw = c.measureText(r.name).width + 10;
     c.fillStyle = "rgba(20,14,30,0.72)";
-    c.fillRect(Math.round(x - tw / 2), Math.round(y - small * 0.62), Math.round(tw), Math.round(small * 1.3));
+    c.fillRect(Math.round(x - tw / 2), Math.round(y - nameF * 0.62), Math.round(tw), Math.round(nameF * 1.3));
     c.fillStyle = r.d.npc ? "#ffd84a" : r.style.gender === "M" ? "#a8d4ff" : "#ffc2dc";
     c.fillText(r.name, x, y + 1);
   }
   // 말풍선
-  c.font = `${small}px Galmuri11, "Apple SD Gothic Neo", sans-serif`;
+  c.font = `${talkF}px Galmuri11, "Apple SD Gothic Neo", sans-serif`;
   for (const r of list) {
     if (!r.speech) continue;
     const x = r.x * S, top = (r.y - SH - 4 - (r.state === "ride" ? r.lift + 2 : 0)) * S - (r.icon ? 14 * S : 0) - (r.beering ? 18 * S : 0);
-    const lines = wrap(c, r.speech.text, small * 13), lh = small * 1.35;
-    const tw = Math.max(...lines.map((l) => c.measureText(l).width)) + 16, th = lh * lines.length + small * 0.6;
+    const lines = wrap(c, r.speech.text, talkF * 11), lh = talkF * 1.35;
+    const tw = Math.max(...lines.map((l) => c.measureText(l).width)) + talkF * 1.4, th = lh * lines.length + talkF * 0.8;
     const bx = Math.round(Math.min(Math.max(x - tw / 2, 4), W * S - tw - 4)), by = Math.round(top - th - 6 * u);
     pixelBox(c, bx, by, tw, th, u * 2, "#ffffff", "#1c1624");
     // 꼬리
