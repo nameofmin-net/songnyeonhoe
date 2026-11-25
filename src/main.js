@@ -11,6 +11,7 @@ import * as respawnBeam from "../pixelfx/fx/spawn/respawn-beam.js";
 import * as confetti from "../pixelfx/fx/ui/confetti.js";
 import * as beer from "./beer.js";
 import * as transform from "./transform.js";
+import { drawSpecial, floatOf } from "./special.js";
 import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf, chatItemHTML } from "./joinform.js";
 
 const W = 640, H = 360;
@@ -360,14 +361,19 @@ class Resident {
     let bob = walking && step % 2 === 1 ? 1 : 0;
     if (this.hop > 0) bob = Math.round(Math.abs(Math.sin(this.hop * Math.PI * 3)) * 4);
     if (this.dance > 0) bob = Math.round(Math.abs(Math.sin(this.t * Math.PI * 5)) * 3);
+    const sp = this.style.sp;
+    bob += floatOf(sp, this.t);
     const x0 = Math.round(this.x) - SW / 2, y0 = Math.round(this.y) - SH - bob;
+    this.spo = sp && sp !== "none" ? { x0, y0, cx: Math.round(this.x), fy: Math.round(this.y), t: this.t, spr, flip: this.flip, seed: this.d.id } : null;
     // 그림자
     const p = painterFor(frame);
     for (let dx = -6; dx <= 6; dx++) for (let dy = -1; dy <= 1; dy++) if ((dx / 6.5) ** 2 + dy * dy < 1.2) p.blendPx(Math.round(this.x) + dx, Math.round(this.y) + dy - 1, 0xff1a1222, 0.45);
     for (const f of this.fx) f.fx.draw(frame, "back");
+    if (this.spo) drawSpecial(painterFor(frame), this.style.sp, "back", this.spo);
     blit(spr, SW, SH, x0, y0, this.flip);
   }
   drawFront() {
+    if (this.spo && !this.hidden) drawSpecial(painterFor(frame), this.style.sp, "front", this.spo);
     for (const f of this.fx) f.fx.draw(frame, "front");
     if (this.icon) {
       const u = this.icon.t, rise = u < 0.18 ? Math.round((1 - u / 0.18) * 5) : 0;

@@ -23,6 +23,38 @@ const BOT_F = ["pants", "jeans", "shorts", "skirt", "longskirt"];
 const XTOP_M = ["santa", "elf", "xsweater"], XTOP_F = ["santa", "santadress", "elf", "xsweater"];
 const XHATS = ["santa", "antler", "elfhat"], XACCS = ["rednose", "scarf"];
 export const FIXED_TOPS = ["santa", "elf", "santadress"];
+// 특수 복장(관종 옷): 기본 복장 위에 통째로 덮어쓰고, 광장에서는 special.js가 효과를 붙인다.
+export const SPECIALS = ["none", "gold", "disco", "tree", "neon", "angel"];
+function specialize(st) {
+  const sp = st.sp;
+  if (!sp || sp === "none") return st;
+  const o = { ...st, hat: "none" };
+  if (sp === "gold") Object.assign(o, { top: "jacket", topColor: "#f2c84b", top2: "#fff0a0", bottom: "pants", bottomColor: "#d9a92a", shoes: "#f2c84b", acc: "sunglasses" });
+  if (sp === "disco") Object.assign(o, { top: "jacket", topColor: "#c9cdd8", top2: "#ff5ac8", bottom: "pants", bottomColor: "#a9adbb", shoes: "#f4f1ea", acc: "sunglasses" });
+  if (sp === "tree") Object.assign(o, { top: "tee", topColor: "#2f8a44", bottom: "pants", bottomColor: "#6a4a2a", shoes: "#6a4a2a", acc: "none" });
+  if (sp === "neon") Object.assign(o, { top: "hoodie", topColor: "#262236", top2: "#5af0ff", bottom: "pants", bottomColor: "#1e1a2c", shoes: "#ff5ac8", acc: "sunglasses" });
+  if (sp === "angel") Object.assign(o, { top: "dress", topColor: "#f6f2ea", top2: "#ffd84a", bottom: "dress", shoes: "#f6f2ea", acc: "none" });
+  return o;
+}
+function paintSpecial(g, st, dir) {
+  const sp = st.sp;
+  if (sp === "gold") {
+    // 왕관
+    const G = hex("#ffd84a"), GD = hex("#d9a92a");
+    g.hline(0, [5, 8, 9, 12], G, 8); g.hline(1, [5, 6, 8, 9, 11, 12], G, 8);
+    g.rows([[2, 5, 12]], G, 8); g.rows([[3, 5, 12]], GD, 8);
+    if (dir !== 1) { g.set(6, 2, hex("#ff4a5a"), 8); g.set(11, 2, hex("#ff4a5a"), 8); g.set(8, 2, hex("#5ab4ff"), 8); g.set(9, 2, hex("#5ab4ff"), 8); }
+  }
+  if (sp === "tree") {
+    const G = hex("#2f9a4a"), GD = hex("#22743a"), Y = hex("#ffd84a");
+    g.rows([[14, 7, 10], [15, 6, 11], [16, 5, 12]], G, 3);
+    g.rows([[17, 5, 12], [18, 4, 13], [19, 3, 14]], G, 3);
+    g.rows([[20, 4, 13], [21, 3, 14], [22, 2, 15]], G, 3);
+    g.hline(16, [5, 12], GD, 3); g.hline(19, [3, 14], GD, 3); g.hline(22, [2, 15], GD, 3);
+    g.rect(7, 23, 10, 23, hex("#7a4a2a"), 4);
+    g.rows([[1, 8, 9], [2, 6, 11], [3, 7, 10]], Y, 8); g.set(8, 0, Y, 8); g.set(7, 4, Y, 8); g.set(10, 4, Y, 8);
+  }
+}
 export const isDress = (top) => top === "dress" || top === "santadress";
 const HATS = ["none", "none", "none", "none", "cap", "beanie"];
 const ACCS = ["none", "none", "none", "glasses", "sunglasses", "headphones", "backpack"];
@@ -427,7 +459,8 @@ function shadeAndOutline(g) {
 }
 
 /** dir 0 앞 1 뒤 2 옆(오른쪽). step 0..3. */
-export function renderSprite(st, dir, step, blink = false) {
+export function renderSprite(st0, dir, step, blink = false) {
+  const st = specialize(st0);
   const g = new Grid();
   paintHair(g, st, dir, true);
   paintAcc(g, st, dir, "back");
@@ -439,6 +472,7 @@ export function renderSprite(st, dir, step, blink = false) {
   paintHat(g, st, dir);
   if (dir !== 1) paintAcc(g, st, dir, "front");
   else if (st.acc === "headphones") paintAcc(g, st, dir, "front");
+  paintSpecial(g, st, dir);
   return shadeAndOutline(g);
 }
 
@@ -459,6 +493,7 @@ export const LABELS = {
   top: { tee: "티셔츠", long: "긴팔", hoodie: "후드티", stripe: "줄무늬", jacket: "재킷", shirt: "셔츠", blouse: "블라우스", overall: "멜빵", dress: "원피스", santa: "🎅 산타 코트", santadress: "🎅 산타 원피스", elf: "🧝 요정 옷", xsweater: "🎄 크리스마스 니트" },
   bottom: { pants: "바지", jeans: "청바지", shorts: "반바지", skirt: "치마", longskirt: "롱스커트", dress: "원피스" },
   hat: { none: "없음", cap: "캡모자", beanie: "비니", santa: "🎅 산타 모자", antler: "🦌 루돌프 뿔", elfhat: "🧝 요정 모자" },
+  sp: { none: "없음", gold: "👑 황금 왕", disco: "🪩 디스코 킹", tree: "🎄 트리 인간", neon: "🌈 네온 사이버", angel: "😇 천사" },
   acc: { none: "없음", glasses: "안경", sunglasses: "선글라스", headphones: "헤드폰", backpack: "백팩", rednose: "🔴 루돌프 코", scarf: "🧣 목도리" },
 };
 /** 성별에 맞는 선택지. 헤어는 모두에게 열어 둔다. */
@@ -469,6 +504,7 @@ export function optionsFor(gender) {
     bottom: gender === "M" ? BOT_M : BOT_F,
     hat: [...uniq(HATS), ...XHATS],
     acc: [...uniq(ACCS), ...XACCS],
+    sp: SPECIALS,
     skin: SKINS,
     hairColor: HAIR_COLORS,
     topColor: CLOTH,

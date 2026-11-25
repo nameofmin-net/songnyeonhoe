@@ -1,5 +1,7 @@
 // 입장(메인 팝업 · 모바일 입장 페이지 공용): 이름+한마디 입장 → 내 캐릭터(복장·한마디 수정)
 import { makePopulation, renderSprite, applyStyle, optionsFor, LABELS, SW, SH, isDress, FIXED_TOPS } from "./characters.js";
+import { createFrame, clearFrame, painterFor, composite } from "../pixelfx/core/index.js";
+import { drawSpecial, floatOf } from "./special.js";
 
 import { ROSTER } from "./roster.js";
 export const ALL = makePopulation(0, 2026, ROSTER);
@@ -119,7 +121,7 @@ const CSS = `
 /* 내 캐릭터 */
 .me-stage { display: flex; gap: 16px; align-items: center; }
 .me-pv { width: 108px; height: 156px; flex: none; display: grid; place-items: center; background: radial-gradient(#2c2444, #1a1428); border: 2px solid #4a3f6a; }
-.me-pv canvas { width: 90px; height: 140px; image-rendering: pixelated; }
+.me-pv canvas { width: 120px; height: 138px; image-rendering: pixelated; }
 .me-name { font-size: 22px; } .me-name.M { color: #a8d4ff; } .me-name.F { color: #ffc2dc; }
 .me-sub { font-size: 12px; color: #9a90b0; margin-top: 6px; line-height: 1.5; }
 .sec { border-top: 2px solid #2e2546; padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
@@ -132,6 +134,17 @@ const CSS = `
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { font: inherit; font-size: 13px; color: #d8cfe8; background: #15101f; border: 2px solid #3a2f52; padding: 6px 10px; cursor: pointer; }
 .chip.on { color: #1c1624; background: #ffd84a; border-color: #fff3b0; }
+.tabs { display: flex; gap: 0; border: 2px solid #4a3f6a; }
+.tabs button { flex: 1; font: inherit; font-size: 14px; padding: 10px; color: #9a90b0; background: #15101f; border: 0; cursor: pointer; }
+.tabs button.on { color: #1c1624; background: #ffd84a; }
+.tabs button:not(.on).sp { color: #ff8ad8; }
+.spgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.spcard { font: inherit; text-align: left; color: #d8cfe8; background: #15101f; border: 2px solid #3a2f52; padding: 10px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.spcard b { font-size: 14px; font-weight: normal; color: #f4eefc; }
+.spcard small { font-size: 11px; color: #9a90b0; line-height: 1.4; }
+.spcard.on { border-color: #ffd84a; background: #2a2140; box-shadow: 0 0 0 2px #ffd84a55; }
+.spcard.on b { color: #ffd84a; }
+.spnote { font-size: 12px; color: #ff8ad8; line-height: 1.5; padding: 8px 10px; background: #2a1830; border: 1px solid #5a3050; }
 .sw { width: 30px; height: 30px; border: 2px solid #3a2f52; cursor: pointer; padding: 0; }
 .sw.on { border-color: #fff; outline: 2px solid #ffd84a; outline-offset: 1px; }
 /* 채팅 공통 */
@@ -177,7 +190,7 @@ const CSS = `
 /* 스크롤해도 내 캐릭터 미리보기는 위에 고정 */
 .mob-sheet .me-stage { position: sticky; top: 0; z-index: 2; background: #110d18; margin: 0 -16px; padding: 14px 16px 12px; border-bottom: 2px solid #2e2546; box-shadow: 0 8px 16px #110d18; }
 .mob-sheet .me-stage .me-pv { width: 84px; height: 120px; }
-.mob-sheet .me-stage .me-pv canvas { width: 72px; height: 112px; }
+.mob-sheet .me-stage .me-pv canvas { width: 84px; height: 97px; }
 .mob-sheet .me-stage > div:last-child { padding-right: 64px; }
 `;
 let cssOn = false;
@@ -192,7 +205,17 @@ const PARTS = [
   ["bottom", "하의", "chip"], ["bottomColor", "하의 색", "color"], ["shoes", "신발", "color"],
   ["hat", "모자", "chip"], ["hatColor", "모자 색", "color"],
   ["acc", "소품", "chip"], ["accColor", "소품 색", "color"],
+  ["sp", "특수 복장", "special"],
 ];
+const SP_DESC = {
+  none: "특수 복장을 벗고 기본 복장으로",
+  gold: "금빛 수트에 왕관, 온몸에서 반짝이와 금가루가 흩날려요",
+  disco: "머리 위에 미러볼이 돌고, 발밑에 조명이 빙글빙글",
+  tree: "내가 트리가 된다. 전구가 깜빡이고 별이 빛나요",
+  neon: "외곽선이 무지개 네온으로 흘러가며 빛나요",
+  angel: "날개가 퍼덕이고 머리 위에 링, 둥실 떠다녀요",
+};
+const PW = 40, PH = 46;
 
 /**
  * 입장 화면을 root에 그린다.
@@ -274,7 +297,7 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
     const editor = `
       <div class="jf">
         <div class="me-stage">
-          <div class="me-pv"><canvas width="${SW}" height="${SH}"></canvas></div>
+          <div class="me-pv"><canvas width="${PW}" height="${PH}"></canvas></div>
           <div><div class="me-name ${d.style.gender}">${esc(d.name)} 님</div><div class="me-sub">${sub}</div></div>
         </div>
         <div class="sec">
@@ -285,6 +308,7 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
         </div>
         <div class="sec">
           <h3>복장 설정</h3>
+          <div class="tabs"><button data-tab="basic" class="on">기본 복장</button><button data-tab="sp" class="sp">✨ 특수 복장</button></div>
           <div class="parts"></div>
           <div class="row2"><button class="btn sub" data-act="rand">🎲 랜덤</button><button class="btn sub" data-act="undo">처음대로</button></div>
           <button class="btn" data-act="save">저장하고 광장에 반영</button>
@@ -344,24 +368,44 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
     const ta = root.querySelector("textarea"), cnt = root.querySelector(".cnt");
     const cur = () => applyStyle(d.style, draft);
     // 미리보기: 앞 → 옆 → 뒤로 돌며 걷기
-    let f = 0;
+    const pf = createFrame(PW, PH), img = g.createImageData(PW, PH), t0 = performance.now();
+    let sprKey = "", sprCache = new Map();
     const paint = () => {
+      const t = (performance.now() - t0) / 1000, f = Math.floor(t / 0.16);
       const seq = [[0, 0], [0, 1], [0, 0], [0, 3], [2, 0], [2, 1], [2, 0], [2, 3], [1, 0], [1, 1], [1, 0], [1, 3]];
       const [dir, step] = seq[Math.floor(f / 2) % seq.length];
-      const spr = renderSprite(cur(), dir, step, false), img = g.createImageData(SW, SH);
-      for (let i = 0; i < spr.length; i++) { const v = spr[i]; if (!v) continue; img.data[i * 4] = v & 255; img.data[i * 4 + 1] = (v >>> 8) & 255; img.data[i * 4 + 2] = (v >>> 16) & 255; img.data[i * 4 + 3] = 255; }
-      g.clearRect(0, 0, SW, SH); g.putImageData(img, 0, 0); f++;
+      const st = cur(), key = JSON.stringify(st);
+      if (key !== sprKey) { sprKey = key; sprCache = new Map(); }
+      let spr = sprCache.get(dir * 10 + step);
+      if (!spr) sprCache.set(dir * 10 + step, (spr = renderSprite(st, dir, step, false)));
+      clearFrame(pf);
+      const cx = PW / 2, fy = PH - 3, x0 = cx - SW / 2, y0 = fy - SH - floatOf(st.sp, t);
+      const o = { x0, y0, cx, fy, t, spr, flip: false, seed: id };
+      const p = painterFor(pf);
+      drawSpecial(p, st.sp, "back", o);
+      for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) { const v = spr[y * SW + x]; if (v && y0 + y >= 0) pf.color[(y0 + y) * PW + x0 + x] = v; }
+      drawSpecial(painterFor(pf), st.sp, "front", o);
+      img.data.fill(0); composite(pf, img.data, null);
+      g.putImageData(img, 0, 0);
     };
-    timer = setInterval(paint, 160); paint();
+    timer = setInterval(paint, 50); paint();
+    let tab = "basic";
     const drawParts = () => {
       const st = cur();
-      parts.innerHTML = PARTS.filter(([k]) => !(k === "hatColor" && st.hat === "none") && !(k === "accColor" && !["headphones", "backpack", "scarf"].includes(st.acc)) && !(k === "bottom" && isDress(st.top)) && !((k === "topColor" || k === "top2") && FIXED_TOPS.includes(st.top)))
+      root.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+      if (tab === "sp") {
+        parts.innerHTML = `<div class="spgrid">${opt.sp.map((v) => `<button class="spcard ${(st.sp || "none") === v ? "on" : ""}" data-k="sp" data-v="${v}"><b>${LABELS.sp[v]}</b><small>${SP_DESC[v]}</small></button>`).join("")}</div>`;
+        return;
+      }
+      const note = st.sp && st.sp !== "none" ? `<div class="spnote">✨ 지금 특수 복장(${LABELS.sp[st.sp]})을 입고 있어요. 기본 복장은 특수 복장 탭에서 '없음'을 고르면 보여요.</div>` : "";
+      parts.innerHTML = note + PARTS.filter(([k]) => k !== "sp").filter(([k]) => !(k === "hatColor" && st.hat === "none") && !(k === "accColor" && !["headphones", "backpack", "scarf"].includes(st.acc)) && !(k === "bottom" && isDress(st.top)) && !((k === "topColor" || k === "top2") && FIXED_TOPS.includes(st.top)))
         .map(([k, name, kind]) => `<div class="opt"><span>${name}</span><div class="chips">${
           opt[k].map((v) => kind === "chip"
             ? `<button class="chip ${st[k] === v ? "on" : ""}" data-k="${k}" data-v="${v}">${LABELS[k]?.[v] ?? v}</button>`
             : `<button class="sw ${st[k] === v ? "on" : ""}" data-k="${k}" data-v="${v}" style="background:${v}" aria-label="${name} ${v}"></button>`).join("")
         }</div></div>`).join("");
     };
+    root.querySelector(".tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) { tab = b.dataset.tab; drawParts(); } });
     parts.addEventListener("click", (e) => {
       const b = e.target.closest("[data-k]"); if (!b) return;
       draft = { ...draft, [b.dataset.k]: b.dataset.v };
@@ -372,7 +416,7 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
     ta.addEventListener("input", counter); counter();
     root.querySelector(".jf").addEventListener("click", async (e) => {
       const act = e.target.closest("[data-act]")?.dataset.act; if (!act) return;
-      if (act === "rand") { const r = (a) => a[Math.floor(Math.random() * a.length)]; draft = {}; for (const [k] of PARTS) draft[k] = r(opt[k]); drawParts(); }
+      if (act === "rand") { const r = (a) => a[Math.floor(Math.random() * a.length)]; draft = {}; for (const [k] of PARTS) if (k !== "sp") draft[k] = r(opt[k]); drawParts(); }
       if (act === "undo") { draft = {}; drawParts(); }
       if (act === "other") { showForm(); return; }
       if (act === "msg" || act === "save") {

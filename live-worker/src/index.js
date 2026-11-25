@@ -28,7 +28,7 @@ export default {
 
 // 복장 설정: 정해진 항목만, 짧은 영문 키워드나 #rrggbb 색만 허용
 const EMOTES = ["cheers", "wave", "heart", "party", "dance", "laugh", "wow", "sleepy"];
-const STYLE_KEYS = ["skin", "hair", "hairColor", "top", "topColor", "top2", "bottom", "bottomColor", "shoes", "hat", "hatColor", "acc", "accColor"];
+const STYLE_KEYS = ["skin", "hair", "hairColor", "top", "topColor", "top2", "bottom", "bottomColor", "shoes", "hat", "hatColor", "acc", "accColor", "sp"];
 function cleanStyle(v) {
   const out = {};
   if (!v || typeof v !== "object") return out;
