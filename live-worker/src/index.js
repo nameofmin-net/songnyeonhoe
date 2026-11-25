@@ -46,9 +46,14 @@ export class Room extends DurableObject {
     ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS att (id INTEGER PRIMARY KEY, message TEXT NOT NULL, at INTEGER NOT NULL)");
     const cols = ctx.storage.sql.exec("PRAGMA table_info(att)").toArray().map((c) => c.name);
     if (!cols.includes("style")) ctx.storage.sql.exec("ALTER TABLE att ADD COLUMN style TEXT NOT NULL DEFAULT '{}'");
+    ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS chat (cid INTEGER PRIMARY KEY AUTOINCREMENT, who INTEGER NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL)");
+    this.lastChat = new Map();
   }
   list() {
     return this.ctx.storage.sql.exec("SELECT id, message, at, style FROM att ORDER BY at").toArray().map(row);
+  }
+  chatlog(n = 80) {
+    return this.ctx.storage.sql.exec("SELECT cid, who, text, at FROM chat ORDER BY cid DESC LIMIT ?", n).toArray().reverse();
   }
   broadcast(msg) {
     const s = JSON.stringify(msg);
@@ -64,6 +69,7 @@ export class Room extends DurableObject {
       const [client, server] = Object.values(new WebSocketPair());
       this.ctx.acceptWebSocket(server);
       server.send(JSON.stringify({ type: "state", attendees: this.list() }));
+      server.send(JSON.stringify({ type: "chatlog", items: this.chatlog() }));
       return new Response(null, { status: 101, webSocket: client });
     }
     if (path === "/api/state" && req.method === "GET") return json(req, { attendees: this.list() });
@@ -100,6 +106,18 @@ export class Room extends DurableObject {
       const had = this.ctx.storage.sql.exec("SELECT id, message, at, style FROM att WHERE id = ?", id).toArray()[0];
       return json(req, { entry: had ? row(had) : null });
     }
+    if (path === "/api/chat") {
+      const who = Number(body.id), text = String(body.text ?? "").replace(/\s+/g, " ").trim().slice(0, 100);
+      if (!text) return json(req, { error: "empty" }, 400);
+      if (!this.ctx.storage.sql.exec("SELECT id FROM att WHERE id = ?", who).toArray().length) return json(req, { error: "not joined" }, 403);
+      const now = Date.now(), last = this.lastChat.get(who) || 0;
+      if (now - last < 1200) return json(req, { error: "slow down" }, 429);
+      this.lastChat.set(who, now);
+      const cid = this.ctx.storage.sql.exec("INSERT INTO chat (who, text, at) VALUES (?, ?, ?) RETURNING cid", who, text, now).one().cid;
+      this.ctx.storage.sql.exec("DELETE FROM chat WHERE cid <= ?", cid - 300);
+      this.broadcast({ type: "chat", cid, who, text, at: now });
+      return json(req, { ok: true });
+    }
     if (path === "/api/cheers") {
       const now = Date.now();
       if (this.lastCheers && now - this.lastCheers < 3000) return json(req, { ok: true, throttled: true });
@@ -107,10 +125,18 @@ export class Room extends DurableObject {
       this.broadcast({ type: "cheers" });
       return json(req, { ok: true });
     }
+    if (path === "/api/chatclear") {
+      if (!this.admin(req)) return json(req, { error: "forbidden" }, 403);
+      this.ctx.storage.sql.exec("DELETE FROM chat");
+      this.broadcast({ type: "chatlog", items: [] });
+      return json(req, { ok: true });
+    }
     if (path === "/api/reset") {
       if (!this.admin(req)) return json(req, { error: "forbidden" }, 403);
       this.ctx.storage.sql.exec("DELETE FROM att");
+      this.ctx.storage.sql.exec("DELETE FROM chat");
       this.broadcast({ type: "state", attendees: [] });
+      this.broadcast({ type: "chatlog", items: [] });
       return json(req, { ok: true });
     }
     return json(req, { error: "not found" }, 404);

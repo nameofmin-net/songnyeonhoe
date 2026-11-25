@@ -8,5 +8,7 @@ connectLive({
   state: (list) => { entries.clear(); for (const a of list) entries.set(a.id, a); ui.sync(); },
   join: (e) => { entries.set(e.id, e); ui.sync(); },
   update: (e) => { entries.set(e.id, e); },
+  chatlog: (items) => ui.chatlog(items),
+  chat: (m) => ui.chat(m),
   status: (on) => { live.textContent = on ? "● 광장과 연결됨" : "○ 광장에 연결 중…"; live.className = on ? "on" : ""; },
 });

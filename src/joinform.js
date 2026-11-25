@@ -7,6 +7,8 @@ export const MAX = ALL.length;
 export const byId = (id) => ALL[id];
 export const sortedByName = (ids) => [...ids].sort((a, b) => ALL[a].name.localeCompare(ALL[b].name, "ko"));
 
+export const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
 // ---------- 복장 덮어쓰기 ----------
 const overrides = new Map(); // id -> 사용자가 고른 항목
 export function setOverride(id, ov) { overrides.set(id, ov && typeof ov === "object" ? ov : {}); }
@@ -25,6 +27,7 @@ async function post(path, body, headers = {}) {
 export const sendJoin = (id, message) => post("/api/join", { id, message });
 export const sendUpdate = (id, patch) => post("/api/update", { id, ...patch });
 export const sendCheers = () => post("/api/cheers");
+export const sendChat = (id, text) => post("/api/chat", { id, text });
 export const resetAll = (key) => post("/api/reset", {}, { "X-Admin-Key": key });
 
 /**
@@ -43,6 +46,8 @@ export function connectLive(h) {
       else if (m.type === "join") { setOverride(m.id, m.style); h.join?.(m); }
       else if (m.type === "update") { setOverride(m.id, m.style); h.update?.(m); }
       else if (m.type === "cheers") h.cheers?.();
+      else if (m.type === "chatlog") h.chatlog?.(m.items || []);
+      else if (m.type === "chat") h.chat?.(m);
     };
     ws.onclose = () => { clearInterval(ping); h.status?.(false); setTimeout(open, wait); wait = Math.min(wait * 2, 15000); };
     ws.onerror = () => { try { ws.close(); } catch {} };
@@ -73,6 +78,14 @@ function spriteURL(style, k, head) {
 /** 캐릭터 정면 그림(data URL). 사용자가 바꾼 복장을 반영. head=true면 머리·어깨만. */
 export const avatarURL = (id, k = 3, head = false) => spriteURL(styleOf(id), k, head);
 
+// ---------- 채팅 한 줄 ----------
+const hhmm = (t) => { const d = new Date(t); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+export function chatItemHTML(m, meId = null) {
+  const d = ALL[m.who]; if (!d) return "";
+  const mine = m.who === meId;
+  return `<li class="ci${mine ? " mine" : ""}" data-cid="${m.cid}"><img src="${avatarURL(m.who, 2, true)}" alt=""><div class="cb"><span class="cn ${d.style.gender}">${esc(d.name)}<time>${hhmm(m.at)}</time></span><p>${esc(m.text)}</p></div></li>`;
+}
+
 // ---------- 화면 ----------
 const CSS = `
 .jf { display: flex; flex-direction: column; gap: 14px; font-family: Galmuri11, "Apple SD Gothic Neo", sans-serif; color: #f4eefc; }
@@ -87,9 +100,9 @@ const CSS = `
 .jf select:focus, .jf textarea:focus { outline: none; border-color: #ffd84a; }
 .jf textarea { resize: none; height: 72px; line-height: 1.5; }
 .jf .cnt { align-self: flex-end; font-size: 11px; color: #7a7090; }
-.jf .btn { font: inherit; font-size: 16px; padding: 12px; color: #1c1624; background: #ffd84a; border: 2px solid #fff3b0; box-shadow: 0 4px 0 #8a6a10; cursor: pointer; }
-.jf .btn:disabled { background: #4a3f6a; border-color: #5a4f7a; color: #9a90b0; box-shadow: none; cursor: default; }
-.jf .btn.sub { background: #2a2140; color: #f4eefc; border-color: #4a3f6a; box-shadow: 0 3px 0 #0008; font-size: 14px; padding: 10px; }
+.jf .btn, .mob .btn { font: inherit; font-size: 16px; padding: 12px; color: #1c1624; background: #ffd84a; border: 2px solid #fff3b0; box-shadow: 0 4px 0 #8a6a10; cursor: pointer; }
+.jf .btn:disabled, .mob .btn:disabled { background: #4a3f6a; border-color: #5a4f7a; color: #9a90b0; box-shadow: none; cursor: default; }
+.jf .btn.sub, .mob .btn.sub { background: #2a2140; color: #f4eefc; border-color: #4a3f6a; box-shadow: 0 3px 0 #0008; font-size: 14px; padding: 10px; }
 .jf .note { font-size: 13px; line-height: 1.5; padding: 10px 12px; background: #2a2140; border: 1px solid #5a4a30; color: #fff3c0; }
 .jf .note:empty { display: none; }
 .jf .msg { text-align: center; font-size: 13px; color: #ffd84a; min-height: 1.2em; }
@@ -111,9 +124,36 @@ const CSS = `
 .chip.on { color: #1c1624; background: #ffd84a; border-color: #fff3b0; }
 .sw { width: 30px; height: 30px; border: 2px solid #3a2f52; cursor: pointer; padding: 0; }
 .sw.on { border-color: #fff; outline: 2px solid #ffd84a; outline-offset: 1px; }
+/* 채팅 공통 */
+.ci { display: flex; gap: 8px; align-items: flex-start; padding: 6px 4px; }
+.ci img { width: 27px; height: 25px; image-rendering: pixelated; flex: none; margin-top: 2px; }
+.ci .cb { min-width: 0; }
+.ci .cn { font-size: 12px; display: flex; gap: 6px; align-items: baseline; }
+.ci .cn.M { color: #a8d4ff; } .ci .cn.F { color: #ffc2dc; }
+.ci time { font-size: 10px; color: #6a6084; }
+.ci p { margin: 3px 0 0; font-size: 14px; line-height: 1.45; color: #f4eefc; background: #2a2140; padding: 6px 10px; display: inline-block; word-break: keep-all; overflow-wrap: anywhere; }
+.ci.mine { flex-direction: row-reverse; text-align: right; }
+.ci.mine .cn { justify-content: flex-end; }
+.ci.mine p { background: #ffd84a; color: #1c1624; }
+/* 모바일: 입장 후 채팅 화면 */
+.mob { height: 100dvh; display: flex; flex-direction: column; font-family: Galmuri11, "Apple SD Gothic Neo", sans-serif; color: #f4eefc; }
+.mob-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #1a1426; border-bottom: 2px solid #3a2f52; flex: none; }
+.mob-head img { width: 36px; height: 56px; image-rendering: pixelated; }
+.mob-head .who { flex: 1; min-width: 0; }
+.mob-head .who b { font-size: 17px; display: block; } .mob-head .who b.M { color: #a8d4ff; } .mob-head .who b.F { color: #ffc2dc; }
+.mob-head .who small { font-size: 11px; color: #9a90b0; }
+.mob-head .btn { padding: 8px 12px; font-size: 13px; }
+.mob-chat { flex: 1; overflow-y: auto; padding: 8px 10px; list-style: none; margin: 0; }
+.mob-chat .empty { color: #7a7090; text-align: center; padding: 40px 10px; font-size: 13px; line-height: 1.6; }
+.mob-in { display: flex; gap: 8px; padding: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom)); background: #1a1426; border-top: 2px solid #3a2f52; flex: none; }
+.mob-in input { flex: 1; min-width: 0; font: inherit; font-size: 16px; color: #f4eefc; background: #15101f; border: 2px solid #4a3f6a; padding: 10px 12px; border-radius: 0; }
+.mob-in input:focus { outline: none; border-color: #ffd84a; }
+.mob-in .btn { padding: 10px 16px; font-size: 15px; }
+.mob-sheet { position: fixed; inset: 0; background: #110d18; overflow-y: auto; padding: 16px; z-index: 5; }
+.mob-sheet[hidden] { display: none; }
+.mob-sheet .close { position: sticky; top: 0; float: right; z-index: 2; }
 `;
 let cssOn = false;
-const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const ME_KEY = "songnyeonhoe-me-v1";
 const readMe = () => { try { const v = localStorage.getItem(ME_KEY); return v === null ? null : +v; } catch { return null; } };
 const writeMe = (id) => { try { id === null ? localStorage.removeItem(ME_KEY) : localStorage.setItem(ME_KEY, String(id)); } catch {} };
@@ -135,10 +175,11 @@ const PARTS = [
  */
 export function mountEntry(root, { lock = true, entries, onEntered }) {
   if (!cssOn) { const s = document.createElement("style"); s.textContent = CSS; document.head.append(s); cssOn = true; }
-  let view = null, me = null, timer = null;
+  let view = null, me = null, timer = null, chatItems = [], renderChat = null;
 
   function showForm(note = "") {
-    view = "form"; me = null; clearInterval(timer);
+    view = "form"; me = null; clearInterval(timer); renderChat = null;
+    document.body.classList.remove("chatting");
     root.innerHTML = `
       <form class="jf" autocomplete="off">
         <div class="jf-head">
@@ -203,7 +244,7 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
     const opt = optionsFor(d.style.gender);
     let draft = { ...(E.style || overrides.get(id) || {}) };
     const sub = why === "new" ? "입장 완료! 광장에 내 캐릭터가 등장했어요 🎉" : why === "already" ? "이미 입장한 이름이에요. 내 캐릭터를 꾸며 보세요." : "언제든 복장과 한마디를 바꿀 수 있어요.";
-    root.innerHTML = `
+    const editor = `
       <div class="jf">
         <div class="me-stage">
           <div class="me-pv"><canvas width="${SW}" height="${SH}"></canvas></div>
@@ -224,6 +265,40 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
         <div class="msg"></div>
         ${lock ? "" : `<button class="btn sub" data-act="other">다른 사람 입장하기</button>`}
       </div>`;
+    if (lock) {
+      document.body.classList.add("chatting");
+      root.innerHTML = `
+        <div class="mob">
+          <header class="mob-head">
+            <img class="mob-av" src="${avatarURL(id, 2)}" alt="">
+            <div class="who"><b class="${d.style.gender}">${esc(d.name)} 님</b><small class="mob-live">${sub}</small></div>
+            <button class="btn sub" data-act="edit">캐릭터 수정</button>
+          </header>
+          <ul class="mob-chat"></ul>
+          <form class="mob-in" autocomplete="off"><input maxlength="100" placeholder="광장에 메시지 보내기" enterkeyhint="send"><button class="btn">전송</button></form>
+          <div class="mob-sheet" hidden><button class="btn sub close" data-act="close">닫기 ✕</button>${editor}</div>
+        </div>`;
+      const list = root.querySelector(".mob-chat"), form = root.querySelector(".mob-in"), input = form.querySelector("input"), sheet = root.querySelector(".mob-sheet");
+      renderChat = () => {
+        const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+        list.innerHTML = chatItems.length ? chatItems.map((m) => chatItemHTML(m, id)).join("") : `<li class="empty">아직 대화가 없어요.<br>첫 인사를 남겨 보세요 👋</li>`;
+        if (atBottom || renderChat.first) list.scrollTop = list.scrollHeight;
+        renderChat.first = false;
+      };
+      renderChat.first = true; renderChat();
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const text = input.value.trim(); if (!text) return;
+        input.value = ""; input.focus();
+        try { await sendChat(id, text); list.scrollTop = list.scrollHeight; }
+        catch (err) { input.value = text; alert(err.message === "slow down" ? "조금 천천히 보내 주세요." : "전송에 실패했어요."); }
+      });
+      root.querySelector(".mob").addEventListener("click", (e) => {
+        const act = e.target.closest("[data-act]")?.dataset.act;
+        if (act === "edit") { sheet.hidden = false; sheet.scrollTop = 0; }
+        if (act === "close") { sheet.hidden = true; root.querySelector(".mob-av").src = avatarURL(id, 2); }
+      });
+    } else root.innerHTML = editor;
     const cv = root.querySelector("canvas"), g = cv.getContext("2d"), parts = root.querySelector(".parts"), out = root.querySelector(".msg");
     const ta = root.querySelector("textarea"), cnt = root.querySelector(".cnt");
     const cur = () => applyStyle(d.style, draft);
@@ -288,5 +363,11 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
   }
   let ready = false;
   showForm();
-  return { sync: () => { ready = true; sync(); }, focus: () => root.querySelector("select")?.focus(), reset: () => showForm() };
+  return {
+    sync: () => { ready = true; sync(); },
+    focus: () => root.querySelector("select")?.focus(),
+    reset: () => showForm(),
+    chatlog: (items) => { chatItems = items.slice(-150); renderChat?.(); },
+    chat: (m) => { chatItems.push(m); if (chatItems.length > 150) chatItems.shift(); renderChat?.(); },
+  };
 }

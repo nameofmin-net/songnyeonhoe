@@ -9,11 +9,13 @@ import { bigTree, drawTreeLights, stage as podium } from "./bigtree.js";
 import { renderSprite, actorFor, SW, SH } from "./characters.js";
 import * as respawnBeam from "../pixelfx/fx/spawn/respawn-beam.js";
 import * as confetti from "../pixelfx/fx/ui/confetti.js";
-import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf } from "./joinform.js";
+import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf, chatItemHTML } from "./joinform.js";
 
 const W = 640, H = 360;
 const CX = W / 2, FY = 216; // 광장 중심(대형 트리)
 const params = new URLSearchParams(location.search);
+// 휴대폰에서는 광장 대신 입장(채팅) 페이지로
+if (matchMedia("(max-width: 760px) and (pointer: coarse)").matches && !params.has("plaza")) location.replace("join.html");
 
 // ---------- 화면 ----------
 const stage = document.getElementById("stage");
@@ -25,7 +27,7 @@ cv.width = W; cv.height = H;
 const img = ctx.createImageData(W, H);
 let S = 3, dpr = 1;
 function resize() {
-  const wide = innerWidth >= 1000, side = wide ? 2 * 236 : 0;
+  const wide = innerWidth >= 1100, side = wide ? 236 + 300 + 24 : 0;
   document.body.classList.toggle("narrow", !wide);
   const avail = Math.min((innerWidth - 24 - side) / W, ((wide ? innerHeight : innerHeight * 0.62) - 96) / H);
   S = Math.max(1, avail >= 2 ? Math.floor(avail) : avail);
@@ -471,11 +473,12 @@ function renderLists(highlight) {
   $("#presN").textContent = pres.length;
   const m = pres.filter(([id]) => ALL[id].style.gender === "M").length;
   $("#presMF").textContent = `남 ${m} · 여 ${pres.length - m}`;
-  $("#waitList").innerHTML = sortedByName(waiting).map((id) =>
+  $("#waitList").innerHTML = !waiting.length ? `<li class="empty">모두 도착했어요 🎉</li>` : sortedByName(waiting).map((id) =>
     `<li><img src="${avatarURL(id, 2, true)}" alt=""><span class="nm ${ALL[id].style.gender}">${ALL[id].name}</span></li>`).join("");
   $("#presList").innerHTML = pres.length ? pres.map(([id, v]) =>
     `<li class="${id === highlight ? "new" : ""}"><img src="${avatarURL(id, 2, true)}" alt=""><div><span class="nm ${ALL[id].style.gender}">${ALL[id].name}</span><p>${esc(v.message)}</p></div></li>`).join("")
     : `<li class="empty">아직 아무도 없어요.<br>첫 번째로 입장해 보세요!</li>`;
+  if (highlight >= 0) $("#presList").scrollTop = 0; // 방금 온 사람이 보이게
   form?.sync();
 }
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -618,12 +621,57 @@ $("#reset").addEventListener("click", async () => {
 buildBackground();
 buildProps();
 form = mountEntry($("#modalBody"), { lock: false, entries: () => present });
+// ---------- 실시간 채팅(보기 전용) ----------
+let chatItems = [];
+function renderChat(newCid) {
+  const ul = $("#chatList");
+  ul.innerHTML = chatItems.length ? chatItems.map((m) => chatItemHTML(m)).join("") : `<li class="empty">아직 대화가 없어요.<br>휴대폰에서 입장해 첫 인사를 남겨 보세요 👋</li>`;
+  if (newCid) ul.querySelector(`[data-cid="${newCid}"]`)?.classList.add("new");
+  ul.scrollTop = ul.scrollHeight;
+  $("#chatN").textContent = chatItems.length ? `${chatItems.length}개` : "";
+}
+function onChat(m) {
+  chatItems.push(m); if (chatItems.length > 150) chatItems.shift();
+  renderChat(m.cid);
+  // 광장의 그 캐릭터가 말풍선으로 말한다
+  const r = people.find((p) => p.d.id === m.who);
+  if (r && !r.hidden) r.say(m.text, 3 + m.text.length * 0.12);
+}
+
+// ---------- 명단 자동 스크롤 ----------
+function autoScroll(el) {
+  let dir = 1, hold = 2.5, hover = false, acc = 0;
+  el.addEventListener("pointerenter", () => (hover = true));
+  el.addEventListener("pointerleave", () => (hover = false));
+  let last = performance.now();
+  const step = (now) => {
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    const max = el.scrollHeight - el.clientHeight;
+    if (!hover && max > 4) {
+      if (hold > 0) hold -= dt;
+      else {
+        acc += dt * 22 * dir; // 초당 22px
+        const whole = Math.trunc(acc); acc -= whole;
+        el.scrollTop += whole;
+        if (dir > 0 && el.scrollTop >= max - 1) { dir = -1; hold = 2.5; }
+        else if (dir < 0 && el.scrollTop <= 0) { dir = 1; hold = 2.5; }
+      }
+    }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+autoScroll($("#presList"));
+autoScroll($("#waitList"));
+
 // 실시간 연결: 명단 동기화 + 입장/건배 신호 (위치는 화면마다 랜덤)
 connectLive({
   state: applyState,
   join: (e) => arrive(e.id, e.message, { at: e.at }),
   update: (e) => arrive(e.id, e.message),
   cheers: cheersAll,
+  chatlog: (items) => { chatItems = items.slice(-150); renderChat(); },
+  chat: onChat,
   status: (on) => { online = on; const el = $("#live"); el.textContent = on ? "● 실시간 연결됨" : "○ 연결 중…"; el.className = on ? "on" : ""; },
 });
 renderLists();

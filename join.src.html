@@ -13,6 +13,9 @@
   .brand { font-size: 13px; color: #ffd84a; letter-spacing: 0.04em; }
   #join { width: min(420px, 100%); background: var(--panel); border: 3px solid var(--line); box-shadow: 0 0 0 3px #1c1624; padding: 20px; }
   #live { color: #c9a0a0; } #live.on { color: #7fe0a0; }
+  body.chatting { padding: 0; gap: 0; height: 100dvh; overflow: hidden; }
+  body.chatting .brand, body.chatting .foot { display: none; }
+  body.chatting #join { width: min(560px, 100%); border: 0; box-shadow: none; padding: 0; background: none; }
   .foot { font-size: 11px; color: #7a7090; text-align: center; line-height: 1.6; max-width: 420px; }
 </style>
 </head>
