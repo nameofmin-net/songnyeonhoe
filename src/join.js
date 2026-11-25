@@ -10,5 +10,6 @@ connectLive({
   update: (e) => { entries.set(e.id, e); },
   chatlog: (items) => ui.chatlog(items),
   chat: (m) => ui.chat(m),
+  emote: (m) => ui.emote(m),
   status: (on) => { live.textContent = on ? "● 광장과 연결됨" : "○ 광장에 연결 중…"; live.className = on ? "on" : ""; },
 });

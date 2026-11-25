@@ -28,6 +28,13 @@ export const sendJoin = (id, message) => post("/api/join", { id, message });
 export const sendUpdate = (id, patch) => post("/api/update", { id, ...patch });
 export const sendCheers = () => post("/api/cheers");
 export const sendChat = (id, text) => post("/api/chat", { id, text });
+export const sendEmote = (id, kind) => post("/api/emote", { id, kind });
+/** 채팅 이모티콘: 누르면 광장의 내 캐릭터가 그 동작을 한다 */
+export const EMOTES = [
+  ["cheers", "🍻", "건배"], ["wave", "👋", "인사"], ["heart", "❤️", "하트"], ["party", "🎉", "축하"],
+  ["dance", "💃", "댄스"], ["laugh", "😂", "웃음"], ["wow", "❗", "놀람"], ["sleepy", "😴", "졸려"],
+];
+export const emoteOf = (k) => EMOTES.find((e) => e[0] === k);
 export const resetAll = (key) => post("/api/reset", {}, { "X-Admin-Key": key });
 
 /**
@@ -48,6 +55,7 @@ export function connectLive(h) {
       else if (m.type === "cheers") h.cheers?.();
       else if (m.type === "chatlog") h.chatlog?.(m.items || []);
       else if (m.type === "chat") h.chat?.(m);
+      else if (m.type === "emote") h.emote?.(m);
     };
     ws.onclose = () => { clearInterval(ping); h.status?.(false); setTimeout(open, wait); wait = Math.min(wait * 2, 15000); };
     ws.onerror = () => { try { ws.close(); } catch {} };
@@ -82,6 +90,7 @@ export const avatarURL = (id, k = 3, head = false) => spriteURL(styleOf(id), k, 
 const hhmm = (t) => { const d = new Date(t); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
 export function chatItemHTML(m, meId = null) {
   const d = ALL[m.who]; if (!d) return "";
+  if (m.kind) { const e = emoteOf(m.kind); return `<li class="ce${m.who === meId ? " mine" : ""}"><img src="${avatarURL(m.who, 2, true)}" alt=""><span class="${d.style.gender}">${esc(d.name)}</span> ${e ? e[1] + " " + e[2] + "!" : ""}</li>`; }
   const mine = m.who === meId;
   return `<li class="ci${mine ? " mine" : ""}" data-cid="${m.cid}"><img src="${avatarURL(m.who, 2, true)}" alt=""><div class="cb"><span class="cn ${d.style.gender}">${esc(d.name)}<time>${hhmm(m.at)}</time></span><p>${esc(m.text)}</p></div></li>`;
 }
@@ -135,6 +144,10 @@ const CSS = `
 .ci.mine { flex-direction: row-reverse; text-align: right; }
 .ci.mine .cn { justify-content: flex-end; }
 .ci.mine p { background: #ffd84a; color: #1c1624; }
+.ce { display: flex; align-items: center; gap: 6px; padding: 3px 4px; font-size: 12px; color: #9a90b0; }
+.ce img { width: 18px; height: 17px; image-rendering: pixelated; }
+.ce .M { color: #a8d4ff; } .ce .F { color: #ffc2dc; }
+.ce.mine { justify-content: flex-end; }
 /* 모바일: 입장 후 채팅 화면 */
 .mob { height: 100dvh; display: flex; flex-direction: column; font-family: Galmuri11, "Apple SD Gothic Neo", sans-serif; color: #f4eefc; }
 .mob-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #1a1426; border-bottom: 2px solid #3a2f52; flex: none; }
@@ -145,6 +158,13 @@ const CSS = `
 .mob-head .btn { padding: 8px 12px; font-size: 13px; }
 .mob-chat { flex: 1; overflow-y: auto; padding: 8px 10px; list-style: none; margin: 0; }
 .mob-chat .empty { color: #7a7090; text-align: center; padding: 40px 10px; font-size: 13px; line-height: 1.6; }
+.mob-emo { display: flex; gap: 6px; overflow-x: auto; padding: 8px 10px 0; background: #1a1426; border-top: 2px solid #3a2f52; flex: none; scrollbar-width: none; }
+.mob-emo button { flex: none; font: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 52px; padding: 6px 4px; background: #241c36; color: #d8cfe8; border: 2px solid #3a2f52; cursor: pointer; font-size: 11px; }
+.mob-emo button i { font-style: normal; font-size: 22px; line-height: 1; }
+.mob-emo button:active, .mob-emo button.on { background: #ffd84a; color: #1c1624; border-color: #fff3b0; }
+.mob-emo + .mob-in { border-top: 0; }
+.mob-head img.hop { animation: hop .6s ease-out; }
+@keyframes hop { 0%,100% { transform: translateY(0); } 30% { transform: translateY(-10px); } 60% { transform: translateY(0); } 80% { transform: translateY(-4px); } }
 .mob-in { display: flex; gap: 8px; padding: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom)); background: #1a1426; border-top: 2px solid #3a2f52; flex: none; }
 .mob-in input { flex: 1; min-width: 0; font: inherit; font-size: 16px; color: #f4eefc; background: #15101f; border: 2px solid #4a3f6a; padding: 10px 12px; border-radius: 0; }
 .mob-in input:focus { outline: none; border-color: #ffd84a; }
@@ -280,6 +300,7 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
             <button class="btn sub" data-act="edit">캐릭터 수정</button>
           </header>
           <ul class="mob-chat"></ul>
+          <div class="mob-emo">${EMOTES.map(([k, e, l]) => `<button type="button" data-emo="${k}"><i>${e}</i>${l}</button>`).join("")}</div>
           <form class="mob-in" autocomplete="off"><input maxlength="100" placeholder="광장에 메시지 보내기" enterkeyhint="send"><button class="btn">전송</button></form>
           <div class="mob-sheet" hidden><button class="btn sub close" data-act="close">닫기 ✕</button>${editor}</div>
         </div>`;
@@ -297,6 +318,19 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
         input.value = ""; input.focus();
         try { await sendChat(id, text); list.scrollTop = list.scrollHeight; }
         catch (err) { input.value = text; alert(err.message === "slow down" ? "조금 천천히 보내 주세요." : "전송에 실패했어요."); }
+      });
+      const live = root.querySelector(".mob-live"), av = root.querySelector(".mob-av");
+      let liveT = 0;
+      root.querySelector(".mob-emo").addEventListener("click", async (e) => {
+        const b = e.target.closest("[data-emo]"); if (!b) return;
+        const em = emoteOf(b.dataset.emo);
+        av.classList.remove("hop"); void av.offsetWidth; av.classList.add("hop");
+        b.classList.add("on"); setTimeout(() => b.classList.remove("on"), 300);
+        try {
+          await sendEmote(id, em[0]);
+          live.textContent = `${em[1]} 광장에서 ${em[2]} 중!`;
+        } catch (err) { live.textContent = err.message === "slow down" ? "조금 천천히 눌러 주세요" : "전송에 실패했어요"; }
+        clearTimeout(liveT); liveT = setTimeout(() => (live.textContent = "광장에 연결돼 있어요"), 2200);
       });
       root.querySelector(".mob").addEventListener("click", (e) => {
         const act = e.target.closest("[data-act]")?.dataset.act;
@@ -374,5 +408,6 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
     reset: () => showForm(),
     chatlog: (items) => { chatItems = items.slice(-150); renderChat?.(); },
     chat: (m) => { chatItems.push(m); if (chatItems.length > 150) chatItems.shift(); renderChat?.(); },
+    emote: (m) => { chatItems.push(m); if (chatItems.length > 150) chatItems.shift(); renderChat?.(); },
   };
 }

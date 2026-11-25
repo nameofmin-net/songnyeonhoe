@@ -9,6 +9,7 @@ import { bigTree, drawTreeLights, stage as podium } from "./bigtree.js";
 import { renderSprite, actorFor, SW, SH } from "./characters.js";
 import * as respawnBeam from "../pixelfx/fx/spawn/respawn-beam.js";
 import * as confetti from "../pixelfx/fx/ui/confetti.js";
+import * as beer from "./beer.js";
 import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf, chatItemHTML } from "./joinform.js";
 
 const W = 640, H = 360;
@@ -266,6 +267,8 @@ class Resident {
   }
   update(dt, now) {
     this.t += dt; this.chatCool -= dt;
+    if (this.hop > 0) this.hop -= dt;
+    if (this.dance > 0) { this.dance -= dt; this.dir = [0, 2, 1, 2][Math.floor(this.t * 5) % 4]; this.flip = Math.floor(this.t * 5) % 4 === 3; if (this.dance <= 0) { this.dir = 0; this.flip = false; } }
     for (const f of this.fx) {
       f.age += dt; f.fx.update(dt);
       f.fx.options.x = Math.round(this.x); f.fx.options.y = Math.round(this.y);
@@ -313,6 +316,21 @@ class Resident {
     this.actor = actorFor(this.sprite(0, 0, false));
     for (const f of this.fx) f.fx.options.actor = this.actor;
   }
+  /** 휴대폰에서 누른 이모티콘을 광장에서 몸으로 보여준다 */
+  emote(kind) {
+    if (this.hidden) return;
+    this.state = "idle"; this.dir = 0; this.flip = false; this.pending = null;
+    const hold = (t) => (this.timer = Math.max(this.timer, t));
+    if (kind === "cheers") { this.play(beer, false); this.hop = 0.5; hold(1.9); }
+    else if (kind === "wave") { this.say("안녕하세요! 👋", 2.6); this.hop = 0.6; hold(1.6); }
+    else if (kind === "heart") { this.play(charmed, true, 2.4); hold(2.4); }
+    else if (kind === "party") { this.play(confetti, false); this.pop("star"); this.hop = 0.6; hold(2.6); }
+    else if (kind === "dance") { this.dance = 2.6; this.pop("note"); hold(2.6); }
+    else if (kind === "laugh") { this.say("ㅋㅋㅋㅋㅋ", 2.2); this.pop("sweat"); this.hop = 0.9; hold(1.6); }
+    else if (kind === "wow") { this.play(exclamation, false); hold(1.4); }
+    else if (kind === "sleepy") { this.play(sleep, true, 3.2); hold(3.2); }
+  }
+  get beering() { return this.fx.some((f) => f.fx.meta === beer.meta); }
   get hidden() {
     const b = this.fx.find((f) => f.fx.meta === respawnBeam.meta);
     return b ? respawnBeam.actorAlpha(b.fx.t) === 0 : false;
@@ -329,7 +347,9 @@ class Resident {
     const blink = !walking && this.t % this.blinkAt < 0.13;
     const sleeping = this.fx.some((f) => f.fx.meta.name === "Sleep");
     const spr = this.sprite(this.dir, step, blink && !sleeping);
-    const bob = walking && step % 2 === 1 ? 1 : 0;
+    let bob = walking && step % 2 === 1 ? 1 : 0;
+    if (this.hop > 0) bob = Math.round(Math.abs(Math.sin(this.hop * Math.PI * 3)) * 4);
+    if (this.dance > 0) bob = Math.round(Math.abs(Math.sin(this.t * Math.PI * 5)) * 3);
     const x0 = Math.round(this.x) - SW / 2, y0 = Math.round(this.y) - SH - bob;
     // 그림자
     const p = painterFor(frame);
@@ -447,7 +467,7 @@ function drawOverlay() {
   c.font = `${small}px Galmuri11, "Apple SD Gothic Neo", sans-serif`;
   for (const r of list) {
     if (!r.speech) continue;
-    const x = r.x * S, top = (r.y - SH - 4) * S - (r.icon ? 14 * S : 0);
+    const x = r.x * S, top = (r.y - SH - 4) * S - (r.icon ? 14 * S : 0) - (r.beering ? 18 * S : 0);
     const lines = wrap(c, r.speech.text, small * 13), lh = small * 1.35;
     const tw = Math.max(...lines.map((l) => c.measureText(l).width)) + 16, th = lh * lines.length + small * 0.6;
     const bx = Math.round(Math.min(Math.max(x - tw / 2, 4), W * S - tw - 4)), by = Math.round(top - th - 6 * u);
@@ -594,7 +614,7 @@ ov.addEventListener("pointerdown", (e) => {
   if (best) best.react();
 });
 function cheersAll() {
-  for (const r of people) setTimeout(() => { r.say(choose(["건배! 🥂", "위하여~!", "건배~!!", "올해도 수고했어요!"])); r.pop("cheers"); }, Math.random() * 600);
+  for (const r of people) setTimeout(() => r.emote("cheers"), Math.random() * 700);
 }
 let online = false;
 document.getElementById("cheers").addEventListener("click", () => { if (online) sendCheers().catch(cheersAll); else cheersAll(); });
@@ -629,6 +649,11 @@ function renderChat(newCid) {
   if (newCid) ul.querySelector(`[data-cid="${newCid}"]`)?.classList.add("new");
   ul.scrollTop = ul.scrollHeight;
   $("#chatN").textContent = chatItems.length ? `${chatItems.length}개` : "";
+}
+function onEmote(m) {
+  chatItems.push(m); if (chatItems.length > 150) chatItems.shift();
+  renderChat();
+  people.find((p) => p.d.id === m.who)?.emote(m.kind);
 }
 function onChat(m) {
   chatItems.push(m); if (chatItems.length > 150) chatItems.shift();
@@ -672,6 +697,7 @@ connectLive({
   cheers: cheersAll,
   chatlog: (items) => { chatItems = items.slice(-150); renderChat(); },
   chat: onChat,
+  emote: onEmote,
   status: (on) => { online = on; const el = $("#live"); el.textContent = on ? "● 실시간 연결됨" : "○ 연결 중…"; el.className = on ? "on" : ""; },
 });
 renderLists();
