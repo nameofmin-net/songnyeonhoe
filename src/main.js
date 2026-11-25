@@ -12,6 +12,7 @@ import * as confetti from "../pixelfx/fx/ui/confetti.js";
 import * as beer from "./beer.js";
 import * as transform from "./transform.js";
 import { drawSpecial, floatOf } from "./special.js";
+import { sfx, setSound, soundOn, savedPref } from "./audio.js";
 import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf, chatItemHTML } from "./joinform.js";
 
 const W = 640, H = 360;
@@ -287,7 +288,7 @@ class Resident {
       this.entering += dt;
       if (this.entering > 1.75) {
         this.entering = undefined;
-        this.play(confetti, false);
+        this.play(confetti, false); sfx.pop();
         if (this.message) this.say(this.message, 7);
       }
       return;
@@ -328,10 +329,10 @@ class Resident {
     if (this.state === "ride") { if (kind === "cheers") this.play(beer, false); return; }
     this.state = "idle"; this.dir = 0; this.flip = false; this.pending = null;
     const hold = (t) => (this.timer = Math.max(this.timer, t));
-    if (kind === "cheers") { this.play(beer, false); this.hop = 0.5; hold(1.9); }
+    if (kind === "cheers") { this.play(beer, false); sfx.cheers(); this.hop = 0.5; hold(1.9); }
     else if (kind === "wave") { this.say("안녕하세요! 👋", 2.6); this.hop = 0.6; hold(1.6); }
     else if (kind === "heart") { this.play(charmed, true, 2.4); hold(2.4); }
-    else if (kind === "party") { this.play(confetti, false); this.pop("star"); this.hop = 0.6; hold(2.6); }
+    else if (kind === "party") { this.play(confetti, false); sfx.pop(); this.pop("star"); this.hop = 0.6; hold(2.6); }
     else if (kind === "dance") { this.dance = 2.6; this.pop("note"); hold(2.6); }
     else if (kind === "laugh") { this.say("ㅋㅋㅋㅋㅋ", 2.2); this.pop("sweat"); this.hop = 0.9; hold(1.6); }
     else if (kind === "wow") { this.play(exclamation, false); hold(1.4); }
@@ -342,7 +343,7 @@ class Resident {
     if (this.hidden) { this.setStyle(st); return; }
     this.state = "idle"; this.dir = 0; this.flip = false; this.dance = 0;
     this.timer = Math.max(this.timer, transform.meta.duration);
-    this.play(transform, false);
+    this.play(transform, false); sfx.transform();
     this.swap = { st, at: this.t + transform.SWAP };
   }
   get beering() { return this.fx.some((f) => f.fx.meta === beer.meta); }
@@ -544,7 +545,7 @@ function npcRide(dt) {
     if (Math.random() < dt * 0.6 && clearPath(deer.x, deer.y, santa.x, santa.y)) { deer.tx = santa.x + (deer.x < santa.x ? -8 : 8); deer.ty = santa.y; deer.state = "walk"; }
   }
   if (Math.hypot(deer.x - santa.x, (deer.y - santa.y) * 1.6) < 16) {
-    ride.t = rnd(7, 10);
+    ride.t = rnd(7, 10); sfx.jingle();
     santa.state = "ride"; santa.lift = 12; santa.mount = deer; santa.speech = null; santa.pending = null;
     deer.carrying = true; deer.speed = 36; deer.state = "idle"; deer.timer = 1.4; deer.dir = 0; deer.flip = false;
     deer.say("할아버지 업히세요! 🦌", 2.4); deer.play(exclamation, false);
@@ -593,13 +594,13 @@ function arrive(id, message, { silent = false, at = Date.now() } = {}) {
   present.set(id, { message, at });
   const r = new Resident(ALL[id], message);
   people.push(r);
-  if (!silent) { r.enter(); announce(id, message); }
+  if (!silent) { r.enter(); announce(id, message); sfx.enter(); }
   else r.timer = rnd(0.3, 3);
   renderLists(silent ? -1 : id);
 }
 function leave(id) {
   const r = people.find((p) => p.d.id === id);
-  if (r && r.last && !r.hidden) dissolve(r);
+  if (r && r.last && !r.hidden) { dissolve(r); sfx.dust(); }
   present.delete(id);
   people = people.filter((p) => p.d.id !== id);
 }
@@ -706,7 +707,7 @@ function tapTree(x, y) {
   if (tree.boom >= 0) return;
   const now = performance.now();
   tree.taps = tree.taps.filter((t) => now - t < TAP_WINDOW); tree.taps.push(now);
-  tree.shake = 0.25;
+  tree.shake = 0.25; sfx.treeTap(tree.taps.length);
   tree.sparks.push({ x, y, t: 0, n: tree.taps.length });
   if (tree.taps.length >= TAPS_NEEDED) {
     tree.taps = [];
@@ -725,7 +726,7 @@ async function askReset() {
 }
 function explodeTree() {
   const p = treeProp(), s = p.spr;
-  tree.boom = 0; tree.bits = [];
+  tree.boom = 0; tree.bits = []; sfx.boom(); setTimeout(() => sfx.regrow(), GROW_AT * 1000);
   // 트리 픽셀을 조각내서 사방으로
   for (let n = 0; n < 900; n++) {
     const x = Math.floor(Math.random() * s.w), y = Math.floor(Math.random() * s.h), c = s.color[y * s.w + x];
@@ -818,7 +819,7 @@ ov.addEventListener("pointerdown", (e) => {
   if (hitTree(x, y)) { tapTree(x, y); return; }
   let best = null, bd = 1e9;
   for (const r of people) { const d = Math.hypot(r.x - x, r.y - 12 - y); if (d < 16 && d < bd) { bd = d; best = r; } }
-  if (best) best.react();
+  if (best) { best.react(); sfx.blip(); }
 });
 function cheersAll() {
   for (const r of people) setTimeout(() => r.emote("cheers"), Math.random() * 700);
@@ -832,6 +833,12 @@ const modal = $("#modal");
 function openModal() { modal.classList.add("on"); form.reset(); form.sync(); setTimeout(() => form.focus(), 50); }
 function closeModal() { modal.classList.remove("on"); }
 $("#joinBtn").addEventListener("click", openModal);
+// 소리: 버튼으로 켜고 끈다. 전에 켜 뒀으면 첫 클릭 때 자동으로 다시 켠다(브라우저 정책상 클릭이 필요).
+const sndBtn = $("#sound");
+const paintSnd = () => (sndBtn.textContent = soundOn() ? "🔊 소리 끄기" : "🔇 캐롤·효과음 켜기");
+sndBtn.addEventListener("click", async () => { await setSound(!soundOn()); paintSnd(); });
+if (savedPref()) addEventListener("pointerdown", async function first(e) { removeEventListener("pointerdown", first); if (e.target !== sndBtn && !soundOn()) { await setSound(true); paintSnd(); } });
+paintSnd();
 modal.addEventListener("pointerdown", (e) => { if (e.target === modal) closeModal(); });
 $("#modalClose").addEventListener("click", closeModal);
 addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
@@ -861,10 +868,11 @@ function onEmote(m) {
   chatItems.push(m); if (chatItems.length > 150) chatItems.shift();
   renderChat();
   people.find((p) => p.d.id === m.who)?.emote(m.kind);
+  if (m.kind !== "cheers") sfx.blip();
 }
 function onChat(m) {
   chatItems.push(m); if (chatItems.length > 150) chatItems.shift();
-  renderChat(m.cid);
+  renderChat(m.cid); sfx.chat();
   // 광장의 그 캐릭터가 말풍선으로 말한다
   const r = people.find((p) => p.d.id === m.who);
   if (r && !r.hidden) r.say(m.text, 3 + m.text.length * 0.12);
