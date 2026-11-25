@@ -9,7 +9,7 @@ import { bigTree, drawTreeLights, stage as podium } from "./bigtree.js";
 import { renderSprite, actorFor, SW, SH } from "./characters.js";
 import * as respawnBeam from "../pixelfx/fx/spawn/respawn-beam.js";
 import * as confetti from "../pixelfx/fx/ui/confetti.js";
-import { ALL, MAX, sortedByName, avatarURL, mountJoinForm, connectLive, sendJoin, sendCheers, resetAll } from "./joinform.js";
+import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf } from "./joinform.js";
 
 const W = 640, H = 360;
 const CX = W / 2, FY = 216; // 광장 중심(대형 트리)
@@ -219,7 +219,7 @@ const FX = { charmed, sleep, confused, stunned };
 
 class Resident {
   constructor(d, message = "") {
-    this.d = d; this.name = d.name; this.style = d.style; this.message = message;
+    this.d = d; this.name = d.name; this.style = styleOf(d.id); this.message = message;
     this.cache = new Map();
     this.actor = actorFor(this.sprite(0, 0, false));
     let x, y;
@@ -304,6 +304,12 @@ class Resident {
         if (this.pickTarget()) this.state = "walk"; else this.timer = rnd(0.5, 1.5);
       }
     }
+  }
+  /** 복장이 바뀌면 스프라이트·이펙트용 실루엣을 다시 만든다 */
+  setStyle(st) {
+    this.style = st; this.cache.clear();
+    this.actor = actorFor(this.sprite(0, 0, false));
+    for (const f of this.fx) f.fx.options.actor = this.actor;
   }
   get hidden() {
     const b = this.fx.find((f) => f.fx.meta === respawnBeam.meta);
@@ -470,7 +476,7 @@ function renderLists(highlight) {
   $("#presList").innerHTML = pres.length ? pres.map(([id, v]) =>
     `<li class="${id === highlight ? "new" : ""}"><img src="${avatarURL(id, 2, true)}" alt=""><div><span class="nm ${ALL[id].style.gender}">${ALL[id].name}</span><p>${esc(v.message)}</p></div></li>`).join("")
     : `<li class="empty">아직 아무도 없어요.<br>첫 번째로 입장해 보세요!</li>`;
-  form?.refresh();
+  form?.sync();
 }
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
@@ -481,9 +487,15 @@ function arrive(id, message, { silent = false, at = Date.now() } = {}) {
   message = String(message || "").slice(0, 40);
   if (present.has(id)) {
     // 이미 와 있으면 한마디만 갱신
-    present.get(id).message = message;
+    const v = present.get(id), changed = v.message !== message;
+    v.message = message;
     const r = people.find((p) => p.d.id === id);
-    if (r) { r.message = message; r.say(message, 6); }
+    if (r) {
+      r.message = message;
+      const st = styleOf(id);
+      if (JSON.stringify(st) !== JSON.stringify(r.style)) { r.setStyle(st); r.pop("star"); r.play(exclamation, false); }
+      if (changed) r.say(message, 6);
+    }
     renderLists(id);
     return;
   }
@@ -503,7 +515,7 @@ function applyState(list) {
   const ids = new Set(list.map((a) => a.id));
   for (const id of [...present.keys()]) if (!ids.has(id)) leave(id);
   for (const a of list) {
-    if (present.has(a.id)) { const v = present.get(a.id); v.message = a.message; v.at = a.at; const r = people.find((p) => p.d.id === a.id); if (r) r.message = a.message; }
+    if (present.has(a.id)) { const v = present.get(a.id); v.message = a.message; v.at = a.at; const r = people.find((p) => p.d.id === a.id); if (r) { r.message = a.message; r.setStyle(styleOf(a.id)); } }
     else arrive(a.id, a.message, { silent: true, at: a.at });
   }
   renderLists();
@@ -587,7 +599,7 @@ document.getElementById("cheers").addEventListener("click", () => { if (online) 
 // 입장 팝업
 let form = null;
 const modal = $("#modal");
-function openModal() { modal.classList.add("on"); form.refresh(); setTimeout(() => form.focus(), 50); }
+function openModal() { modal.classList.add("on"); form.reset(); form.sync(); setTimeout(() => form.focus(), 50); }
 function closeModal() { modal.classList.remove("on"); }
 $("#joinBtn").addEventListener("click", openModal);
 modal.addEventListener("pointerdown", (e) => { if (e.target === modal) closeModal(); });
@@ -605,11 +617,7 @@ $("#reset").addEventListener("click", async () => {
 
 buildBackground();
 buildProps();
-form = mountJoinForm($("#modalBody"), {
-  waiting: () => ALL.map((d) => d.id).filter((id) => !present.has(id)),
-  onSubmit: (id, message) => sendJoin(id, message).then(() => setTimeout(closeModal, 600)),
-  doneText: "입장! 광장을 보세요 🎉",
-});
+form = mountEntry($("#modalBody"), { lock: false, entries: () => present });
 // 실시간 연결: 명단 동기화 + 입장/건배 신호 (위치는 화면마다 랜덤)
 connectLive({
   state: applyState,

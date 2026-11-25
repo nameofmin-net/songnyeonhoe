@@ -370,3 +370,42 @@ export function actorFor(sprite) {
   const y = -h;
   return { mask: { w: SW, h, data }, pixels, x: -SW / 2, y, w: SW, h, k: 2, head: [0, y], chest: [0, y + 15], eyes: [[6, 9 - r0], [11, 9 - r0]] };
 }
+
+// ---------- 복장 설정(입장 후 내 캐릭터 꾸미기) ----------
+const uniq = (a) => [...new Set(a)];
+export const LABELS = {
+  hair: { short: "짧은머리", side: "옆가르마", parted: "가르마", spiky: "삐죽머리", buzz: "버즈컷", mid: "중단발", curly: "곱슬", long: "긴머리", wavy: "웨이브", bob: "단발", pixie: "숏컷", pony: "포니테일", twin: "양갈래", bun: "똥머리" },
+  top: { tee: "티셔츠", long: "긴팔", hoodie: "후드티", stripe: "줄무늬", jacket: "재킷", shirt: "셔츠", blouse: "블라우스", overall: "멜빵", dress: "원피스" },
+  bottom: { pants: "바지", jeans: "청바지", shorts: "반바지", skirt: "치마", longskirt: "롱스커트", dress: "원피스" },
+  hat: { none: "없음", cap: "캡모자", beanie: "비니" },
+  acc: { none: "없음", glasses: "안경", sunglasses: "선글라스", headphones: "헤드폰", backpack: "백팩" },
+};
+/** 성별에 맞는 선택지. 헤어는 모두에게 열어 둔다. */
+export function optionsFor(gender) {
+  return {
+    hair: uniq([...HAIR_M, ...HAIR_F]),
+    top: gender === "M" ? TOP_M : TOP_F,
+    bottom: gender === "M" ? BOT_M : BOT_F,
+    hat: uniq(HATS),
+    acc: uniq(ACCS),
+    skin: SKINS,
+    hairColor: HAIR_COLORS,
+    topColor: CLOTH,
+    top2: CLOTH,
+    bottomColor: BOTTOMS,
+    shoes: SHOES,
+    hatColor: CLOTH,
+    accColor: CLOTH,
+  };
+}
+/** 기본 스타일 위에 사용자가 고른 항목을 얹는다(잘못된 값은 무시). */
+export function applyStyle(base, ov = {}) {
+  const st = { ...base }, opt = optionsFor(base.gender);
+  for (const [k, v] of Object.entries(ov || {})) {
+    const list = opt[k];
+    if (list && list.map((x) => x.toLowerCase()).includes(String(v).toLowerCase())) st[k] = list.find((x) => x.toLowerCase() === String(v).toLowerCase());
+  }
+  if (st.top === "dress") st.bottom = "dress";
+  else if (st.bottom === "dress") st.bottom = base.bottom === "dress" ? "pants" : base.bottom;
+  return st;
+}

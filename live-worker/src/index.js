@@ -26,14 +26,29 @@ export default {
   },
 };
 
+// 복장 설정: 정해진 항목만, 짧은 영문 키워드나 #rrggbb 색만 허용
+const STYLE_KEYS = ["skin", "hair", "hairColor", "top", "topColor", "top2", "bottom", "bottomColor", "shoes", "hat", "hatColor", "acc", "accColor"];
+function cleanStyle(v) {
+  const out = {};
+  if (!v || typeof v !== "object") return out;
+  for (const k of STYLE_KEYS) {
+    const x = v[k];
+    if (typeof x === "string" && /^([a-z]{2,12}|#[0-9a-f]{6})$/i.test(x)) out[k] = x.toLowerCase();
+  }
+  return out;
+}
+const row = (r) => ({ id: r.id, message: r.message, at: r.at, style: JSON.parse(r.style || "{}") });
+
 export class Room extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.env = env;
     ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS att (id INTEGER PRIMARY KEY, message TEXT NOT NULL, at INTEGER NOT NULL)");
+    const cols = ctx.storage.sql.exec("PRAGMA table_info(att)").toArray().map((c) => c.name);
+    if (!cols.includes("style")) ctx.storage.sql.exec("ALTER TABLE att ADD COLUMN style TEXT NOT NULL DEFAULT '{}'");
   }
   list() {
-    return this.ctx.storage.sql.exec("SELECT id, message, at FROM att ORDER BY at").toArray();
+    return this.ctx.storage.sql.exec("SELECT id, message, at, style FROM att ORDER BY at").toArray().map(row);
   }
   broadcast(msg) {
     const s = JSON.stringify(msg);
@@ -60,11 +75,30 @@ export class Room extends DurableObject {
       const id = Number(body.id), message = String(body.message ?? "").trim().slice(0, MSG);
       if (!Number.isInteger(id) || id < 0 || id >= MAX) return json(req, { error: "bad id" }, 400);
       if (!message) return json(req, { error: "empty message" }, 400);
-      const at = Date.now();
-      const had = this.ctx.storage.sql.exec("SELECT at FROM att WHERE id = ?", id).toArray()[0];
-      this.ctx.storage.sql.exec("INSERT INTO att (id, message, at) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET message = excluded.message", id, message, at);
-      this.broadcast({ type: had ? "update" : "join", id, message, at: had ? had.at : at });
-      return json(req, { ok: true, again: !!had });
+      const had = this.ctx.storage.sql.exec("SELECT id, message, at, style FROM att WHERE id = ?", id).toArray()[0];
+      // 이미 입장한 이름이면 새로 넣지 않고 그 사람의 정보를 돌려준다
+      if (had) return json(req, { ok: false, already: true, entry: row(had) });
+      const at = Date.now(), style = cleanStyle(body.style);
+      this.ctx.storage.sql.exec("INSERT INTO att (id, message, at, style) VALUES (?, ?, ?, ?)", id, message, at, JSON.stringify(style));
+      this.broadcast({ type: "join", id, message, at, style });
+      return json(req, { ok: true, entry: { id, message, at, style } });
+    }
+    if (path === "/api/update") {
+      const id = Number(body.id);
+      const had = this.ctx.storage.sql.exec("SELECT id, message, at, style FROM att WHERE id = ?", id).toArray()[0];
+      if (!had) return json(req, { error: "not joined" }, 404);
+      const cur = row(had);
+      const message = body.message === undefined ? cur.message : String(body.message).trim().slice(0, MSG) || cur.message;
+      const style = body.style === undefined ? cur.style : cleanStyle(body.style);
+      this.ctx.storage.sql.exec("UPDATE att SET message = ?, style = ? WHERE id = ?", message, JSON.stringify(style), id);
+      const e = { id, message, at: cur.at, style };
+      this.broadcast({ type: "update", ...e });
+      return json(req, { ok: true, entry: e });
+    }
+    if (path === "/api/me" ) {
+      const id = Number(body.id);
+      const had = this.ctx.storage.sql.exec("SELECT id, message, at, style FROM att WHERE id = ?", id).toArray()[0];
+      return json(req, { entry: had ? row(had) : null });
     }
     if (path === "/api/cheers") {
       const now = Date.now();
