@@ -17,6 +17,10 @@ const CSS = `
 .ctl .red { background: #b8332f; border-color: #ff7a6a; color: #fff; box-shadow: 0 4px 0 #5a1010; }
 .ctl .card { background: #1c1630; border: 2px solid #3a2f52; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .ctl .card h4 { margin: 0; font-size: 16px; font-weight: normal; color: #fff; }
+.ctl .card h4 small { font-size: 11px; color: #9a90b0; margin-left: 6px; }
+.ctl .card.base { border-color: #5a4a30; background: #221a28; }
+.ctl .card.base.live { border-color: #5ae08a; }
+.ctl .card.base b { color: #5ae08a; font-weight: normal; }
 .ctl .card p { margin: 0; font-size: 12px; color: #9a90b0; line-height: 1.5; }
 .ctl .card .row { display: flex; gap: 8px; }
 .ctl .card .row button { flex: 1; }
@@ -58,7 +62,7 @@ export function mountController({ entries }) {
   const el = document.createElement("div");
   el.className = "ctl"; el.hidden = true;
   document.body.appendChild(el);
-  let menus = [], show = null, view = "list", draft = null, query = "", sortMode = "here", busy = false, msg = "";
+  let menus = [], show = null, mode = null, view = "list", draft = null, query = "", sortMode = "here", busy = false, msg = "";
 
   const call = async (path, body) => {
     try { return await adminPost(path, body); }
@@ -76,7 +80,7 @@ export function mountController({ entries }) {
   async function open() {
     if (!(await ensureKey())) return;
     el.hidden = false; view = "list"; msg = "불러오는 중…"; render();
-    try { const r = await call("/api/menus"); menus = r.menus; show = r.show; msg = ""; render(); } catch { /* 위에서 처리 */ }
+    try { const r = await call("/api/menus"); menus = r.menus; show = r.show; mode = r.mode; msg = ""; render(); } catch { /* 위에서 처리 */ }
   }
   const close = () => (el.hidden = true);
 
@@ -88,6 +92,11 @@ export function mountController({ entries }) {
       <div class="ctl-head"><b>🎮 컨트롤러</b><button data-a="close">닫기 ✕</button></div>
       <div class="ctl-body">
         ${show && m ? remoteHTML(m) : ""}
+        <div class="card base ${mode === "ceremony" ? "live" : ""}">
+          <h4>🎤 시상식 준비 모드 <small>기본 메뉴</small></h4>
+          <p>트리가 사라지고 모두 광장 바닥에 줄 맞춰 앉아 단상을 봐요. 최근화 대표님은 단상으로 올라가요.${mode === "ceremony" ? "<br><b>● 지금 준비 모드 중</b>" : ""}</p>
+          <div class="row">${mode === "ceremony" ? `<button class="big red" data-a="modeoff" ${busy ? "disabled" : ""}>■ 준비 모드 끝내기</button>` : `<button class="big" data-a="modeon" ${busy ? "disabled" : ""}>▶ 시작</button>`}</div>
+        </div>
         <button class="big" data-a="new">＋ 새 메뉴 만들기</button>
         ${menus.length ? menus.map((x) => `
           <div class="card">
@@ -179,11 +188,17 @@ export function mountController({ entries }) {
     if (a === "again" && show) { await go({ sid: show.sid, step: 1 }); setTimeout(() => go({ sid: show.sid, step: 2 }), 1300); return; }
     if (a === "prev" && show) return go({ sid: show.sid, step: show.step - 1 });
     if (a === "stop") return go({ sid: 0, step: -1 });
+    if (a === "modeon" || a === "modeoff") {
+      busy = true; render();
+      try { const r = await call("/api/mode", { mode: a === "modeon" ? "ceremony" : null }); mode = r.mode; msg = ""; } catch (err) { msg = err.message === "forbidden" ? "" : "광장에 보내지 못했어요."; }
+      setTimeout(() => { busy = false; render(); }, 1200); render();
+    }
   });
 
   return {
     open,
     /** 서버에서 무대 상태가 바뀌면(다른 기기 포함) 리모컨에 반영 */
     onShow(sh) { show = sh; if (!el.hidden && view === "list") render(); },
+    onMode(m) { mode = m; if (!el.hidden && view === "list") render(); },
   };
 }

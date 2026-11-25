@@ -14,5 +14,6 @@ connectLive({
   chat: (m) => ui.chat(m),
   emote: (m) => ui.emote(m),
   show: (sh) => ctl.onShow(sh),
+  mode: (m) => ctl.onMode(m),
   status: (on) => { live.textContent = on ? "● 광장과 연결됨" : "○ 광장에 연결 중…"; live.className = on ? "on" : ""; },
 });

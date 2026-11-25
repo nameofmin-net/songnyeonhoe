@@ -12,6 +12,7 @@ import * as confetti from "../pixelfx/fx/ui/confetti.js";
 import * as beer from "./beer.js";
 import * as transform from "./transform.js";
 import { drawSpecial, floatOf } from "./special.js";
+import { createCurtain } from "./curtain.js";
 import { sfx, setSound, soundOn, savedPref } from "./audio.js";
 import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf, chatItemHTML } from "./joinform.js";
 
@@ -163,13 +164,14 @@ function buildProps() {
   addProp(podium, CX, 104, [CX - 76, 44, CX + 76, 108], [CX, 70, 60, "#fff0c0", 0.25]);
   // 중앙 대형 트리
   addProp(bigTree, CX, FY + 20, null);
-  blocks.push({ ell: [CX, FY + 12, 62, 16] });
+  blocks.push({ ell: [CX, FY + 12, 62, 16], tree: true });
 }
 
 function blocked(x, y) {
   if (x < 12 || x > W - 12 || y < FLOOR_TOP + 10 || y > H - 6) return true;
   if (x + (H - y) * 1.1 < 96 || W - x + (H - y) * 1.1 < 96) return true; // 화단
   for (const b of blocks) {
+    if (b.tree && ceremony?.on) continue;
     if (b.ell) { const [cx, cy, rx, ry] = b.ell; if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 < 1) return true; }
     else if (x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]) return true;
   }
@@ -188,6 +190,8 @@ const LINES = [
   "2차 가실 분~?", "이 노래 좋다 ♪", "새해 복 많이 받으세요!", "올해 목표 이뤘어요?", "배고파요 🍗",
   "오늘 드레스코드 레드!", "내년엔 더 잘될 거예요", "ㅋㅋㅋㅋㅋ", "소원 빌었어요 ✨", "선물 교환 하죠!",
 ];
+const SIT_LINES = ["두근두근 누가 받을까?", "대표님 멋있어요! 👏", "박수 준비~ 👏👏", "저 상 받고 싶다…", "곧 시작한다!", "조용조용 🤫", "올해 MVP 누구일까?", "사진 찍어야지 📸", "앞에 잘 보여요?", "와 무대 멋지다", "떨린다…", "상품 뭐예요? 🎁", "기대된다 ✨", "누구 상 받을 것 같아요?"];
+const CEO_LINES = ["여러분 올 한 해 정말 고생 많으셨습니다!", "자, 시상식을 시작하겠습니다 🎤", "모두 박수 한번 주세요 👏", "내년에도 함께 갑시다!", "에헴… 마이크 테스트 🎤", "오늘 다들 멋지네요!"];
 const GREET = ["안녕하세요!", "오 반가워요!", "어, 왔어요?", "올해 수고 많았어요!", "여기서 보네요 ㅎㅎ"];
 const REPLY = ["네 반가워요 😊", "수고하셨어요~", "건배해요! 🥂", "내년에도 화이팅!", "ㅎㅎ 안녕하세요"];
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -295,6 +299,7 @@ class Resident {
     }
 
     if (this.state === "ride") return; // 업혀 가는 중: 위치는 npcRide()가 정한다
+    if (this.seat && this.state !== "chat") { this.seatLogic(dt); return; }
     if (this.state === "walk") {
       const dx = this.tx - this.x, dy = this.ty - this.y, d = Math.hypot(dx, dy);
       if (d < 1.5) { this.state = "idle"; this.timer = rnd(1.2, 4.5); if (Math.random() < 0.55) this.dir = 0; if (Math.random() < 0.6) this.react(); return; }
@@ -316,6 +321,31 @@ class Resident {
         if (this.pickTarget()) this.state = "walk"; else this.timer = rnd(0.5, 1.5);
       }
     }
+  }
+  /** 시상식 준비: 자리로 걸어가서 앉아(또는 서서) 단상을 본다 */
+  seatLogic(dt) {
+    const s = this.seat, dx = s.x - this.x, dy = s.y - this.y, d = Math.hypot(dx, dy);
+    if (s.jump && d > 1.5 && d < 40) {
+      // 단상 앞에 오면 폴짝 올라간다
+      this.x = s.x; this.y = s.y; this.hop = 0.7; this.say(choose(CEO_LINES), 4); return;
+    }
+    if (d > 1.5) {
+      if (this.timer > 0 && this.state !== "walk") { this.timer -= dt; return; } // 감정표현 중엔 잠깐 멈춤
+      const tx = s.jump ? s.jx : s.x, ty = s.jump ? s.jy : s.y, ex = tx - this.x, ey = ty - this.y, e = Math.max(0.001, Math.hypot(ex, ey));
+      const sp = this.speed * 1.5;
+      if (e < 1.5 && s.jump) { this.x = s.x; this.y = s.y; this.hop = 0.7; this.say(choose(CEO_LINES), 4); return; }
+      this.state = "walk";
+      this.x += (ex / e) * Math.min(sp * dt, e); this.y += (ey / e) * Math.min(sp * dt, e);
+      if (Math.abs(ex) > Math.abs(ey) * 0.9) { this.dir = 2; this.flip = ex < 0; } else this.dir = ey > 0 ? 0 : 1;
+      return;
+    }
+    this.x = s.x; this.y = s.y;
+    if (this.state === "walk") { this.state = s.stand ? "idle" : "sit"; this.timer = 0; }
+    if (this.dance > 0) return;
+    if (this.timer > 0) { this.timer -= dt; return; }
+    this.state = s.stand ? "idle" : "sit"; this.dir = s.face ?? 1; this.flip = false;
+    const lines = this.d.name === CEO_NAME ? CEO_LINES : this.d.npc ? this.d.lines : SIT_LINES;
+    if (Math.random() < dt * (this.d.name === CEO_NAME ? 0.12 : this.d.npc ? 0.05 : 0.012)) this.say(choose(lines), 3.2);
   }
   /** 복장이 바뀌면 스프라이트·이펙트용 실루엣을 다시 만든다 */
   setStyle(st) {
@@ -375,11 +405,17 @@ class Resident {
     this.spo = sp && sp !== "none" ? { x0, y0, cx: Math.round(this.x), fy: Math.round(this.y), t: this.t, spr, flip: this.flip, dir: this.dir, seed: Math.abs(this.d.id) } : null;
     // 그림자
     const p = painterFor(frame);
-    if (this.state !== "ride") for (let dx = -6; dx <= 6; dx++) for (let dy = -1; dy <= 1; dy++) if ((dx / 6.5) ** 2 + dy * dy < 1.2) p.blendPx(Math.round(this.x) + dx, Math.round(this.y) + dy - 1, 0xff1a1222, 0.45);
+    if (this.state !== "ride" && !this.onStage) for (let dx = -6; dx <= 6; dx++) for (let dy = -1; dy <= 1; dy++) if ((dx / 6.5) ** 2 + dy * dy < 1.2) p.blendPx(Math.round(this.x) + dx, Math.round(this.y) + dy - 1, 0xff1a1222, 0.45);
     for (const f of this.fx) f.fx.draw(frame, "back");
     if (this.spo) drawSpecial(painterFor(frame), this.style.sp, "back", this.spo);
-    blit(spr, SW, SH, x0, y0, this.flip);
-    this.last = { spr, x0, y0, flip: this.flip };
+    if (this.state === "sit") {
+      // 앉은 모습: 다리를 감추고 몸을 내린다(뒤에서 본 모습)
+      blit(spr, SW, 22, x0, y0 + 5, this.flip);
+      const cut = spr.slice(); cut.fill(0, SW * 22); this.last = { spr: cut, x0, y0: y0 + 5, flip: this.flip };
+    } else {
+      blit(spr, SW, SH, x0, y0, this.flip);
+      this.last = { spr, x0, y0, flip: this.flip };
+    }
   }
   drawFront() {
     if (this.spo && !this.hidden) drawSpecial(painterFor(frame), this.style.sp, "front", this.spo);
@@ -481,7 +517,7 @@ function drawOverlay() {
   // 이름표
   c.font = `${nameF}px Galmuri11, "Apple SD Gothic Neo", sans-serif`;
   for (const r of list) {
-    if (r.hidden || r.state === "ride") continue;
+    if (r.hidden || r.state === "ride" || r.state === "sit") continue;
     const x = r.x * S, y = (r.y + 3) * S + nameF * 0.6;
     const tw = c.measureText(r.name).width + 10;
     c.fillStyle = "rgba(20,14,30,0.72)";
@@ -539,6 +575,7 @@ function npcRide(dt) {
     return;
   }
   ride.cool -= dt;
+  if (ceremony?.on) return;
   if (ride.cool > 0 || santa.hidden || deer.hidden || santa.busy || deer.busy) return;
   // 가끔 루돌프가 산타 쪽으로 간다
   if (deer.state !== "walk" || Math.random() < dt * 0.3) {
@@ -595,6 +632,7 @@ function arrive(id, message, { silent = false, at = Date.now() } = {}) {
   const r = new Resident(ALL[id], message);
   people.push(r);
   if (!silent) { r.enter(); announce(id, message); sfx.enter(); }
+  if (ceremony.on) setTimeout(() => { if (ceremony.on && !r.seat) { if (r.d.name === CEO_NAME) seatEveryoneOne(r); else { const taken = people.filter((p) => p.seat).map((p) => p.seat); const s = seatsFor(people.length).find((q) => !taken.some((t) => Math.abs(t.x - q.x) < 2 && Math.abs(t.y - q.y) < 2)); if (s) r.seat = { x: s.x, y: s.y }; } } }, silent ? 0 : 4500);
   else r.timer = rnd(0.3, 3);
   renderLists(silent ? -1 : id);
 }
@@ -641,9 +679,9 @@ function randomArrivals(n, local = false) {
 function chats() {
   for (let i = 0; i < people.length; i++) {
     const a = people[i];
-    if (a.state !== "walk" || a.chatCool > 0) continue;
+    if (a.state !== "walk" || a.chatCool > 0 || a.seat) continue;
     for (const b of people) {
-      if (b === a || b.chatCool > 0 || b.busy) continue;
+      if (b === a || b.chatCool > 0 || b.busy || b.seat) continue;
       if (Math.abs(a.x - b.x) < 26 && Math.abs(a.y - b.y) < 8 && Math.abs(a.x - b.x) > 10) {
         for (const [s, o] of [[a, b], [b, a]]) { s.state = "chat"; s.timer = rnd(3.2, 4.2); s.dir = 2; s.flip = o.x < s.x; s.chatCool = rnd(14, 24); }
         a.say(choose(GREET)); b.pending = { at: performance.now() / 1000 + 1.1, text: choose(REPLY) };
@@ -664,7 +702,7 @@ function tick(nowMs) {
 
   frame.color.fill(0); frame.light.set(staticLight);
   drawGarland(now);
-  const items = [...people.map((r) => ({ y: r.y, r })), ...props.map((p) => ({ y: p.y, p }))];
+  const items = [...people.map((r) => ({ y: r.onStage ? 104.5 : r.y, r })), ...props.map((p) => ({ y: p.y, p }))];
   items.sort((a, b) => a.y - b.y);
   for (const it of items) {
     if (it.r) it.r.draw();
@@ -696,7 +734,7 @@ const TAPS_NEEDED = 10, TAP_WINDOW = 5000;
 const tree = { taps: [], shake: 0, boom: -1, bits: [], sparks: [], dust: [] };
 const treeProp = () => props.find((p) => p.spr === bigTree);
 function hitTree(x, y) {
-  const p = treeProp(); if (!p) return false;
+  const p = treeProp(); if (!p || tree.gone) return false;
   const s = p.spr, lx = Math.floor(x - (p.x - s.ox)), ly = Math.floor(y - (p.y - s.oy));
   if (lx < 0 || ly < 0 || lx >= s.w || ly >= s.h) return false;
   // 트리 픽셀 근처면 인정(손가락 오차)
@@ -811,7 +849,7 @@ function sparkleAt(p, x, y, u, n) {
   p.glow(x, y, 6, c, 0.4 * a);
 }
 // 트리 행 중 보이는 시작 줄(0 = 전부, h = 안 보임)
-const treeFromRow = () => (tree.boom < 0 ? 0 : Math.ceil(bigTree.h * (1 - growOf(tree.boom))));
+const treeFromRow = () => (tree.gone ? bigTree.h : tree.boom < 0 ? 0 : Math.ceil(bigTree.h * (1 - growOf(tree.boom))));
 
 // 클릭 → 그 사람이 반응
 ov.addEventListener("pointerdown", (e) => {
@@ -880,15 +918,84 @@ function onChat(m) {
 
 // ---------- 시상식: 빨간 커튼 무대 (어드민 컨트롤러가 재생) ----------
 const showEl = $("#show"), showCard = showEl.querySelector(".sh-card");
+const curtain = createCurtain(showEl.querySelector(".curtain"));
 let showCur = null, showChain = Promise.resolve();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const HAPPY = ["감사합니다! 🙏", "제가요?! 😆", "와 대박!", "팀원들 덕분이에요!", "내년에도 열심히!", "기분 최고 ✨", "상금은요? 💰", "엄마 나 상 받았어!", "꺅! 🎉", "눈물 날 것 같아요 🥹", "다 같이 받은 상이에요!", "사랑합니다 💖"];
+const HAPPY_EMO = ["🎉", "✨", "💖", "👍", "😆", "🏆", "👏", "🥳"];
+// 수상자 걷기 애니메이션 상태
+let walkers = [], walkRaf = 0;
+function spriteImage(st, dir, step, cache) {
+  const k = dir * 10 + step;
+  if (cache.has(k)) return cache.get(k);
+  const spr = renderSprite(st, dir, step, false), img = new ImageData(SW, SH);
+  for (let i = 0; i < spr.length; i++) { const v = spr[i]; if (!v) continue; img.data[i * 4] = v & 255; img.data[i * 4 + 1] = (v >>> 8) & 255; img.data[i * 4 + 2] = (v >>> 16) & 255; img.data[i * 4 + 3] = 255; }
+  cache.set(k, img); return img;
+}
 function fillShow(sh) {
   const n = sh.people.length, ph = n <= 6 ? 22 : n <= 12 ? 17 : n <= 24 ? 12 : 8, pf = n <= 6 ? 2.3 : n <= 12 ? 1.9 : n <= 24 ? 1.6 : 1.35;
   showCard.style.setProperty("--ph", ph + "cqh"); showCard.style.setProperty("--pf", pf + "cqw");
   showCard.innerHTML = `<div class="sh-t"><small>2026 U PLEAT AWARDS</small>${esc(sh.title)}</div>
     ${sh.sub ? `<div class="sh-s">${esc(sh.sub)}</div>` : ""}
-    <div class="ppl">${sh.people.filter((id) => ALL[id]).map((id, i) => `<div class="pp" style="animation-delay:${(0.25 + i * Math.min(0.12, 1.6 / Math.max(1, n))).toFixed(2)}s"><img src="${avatarURL(id, 3)}" alt=""><b>${esc(ALL[id].name)}${ALL[id].rank ? `<small>${ALL[id].rank}</small>` : ""}</b></div>`).join("")}</div>
+    <div class="ppl">${sh.people.filter((id) => ALL[id]).map((id) => `<div class="pp" data-id="${id}"><div class="bub"></div><div class="emo"></div><canvas width="${SW}" height="${SH}"></canvas><b>${esc(ALL[id].name)}${ALL[id].rank ? `<small>${ALL[id].rank}</small>` : ""}</b></div>`).join("")}</div>
     <div class="sh-congrats">🎉 축하합니다! 🎉</div>`;
+  walkers = []; cancelAnimationFrame(walkRaf); walkRaf = 0;
+}
+// 수상자들이 양옆에서 걸어 나와 자기 자리(일정한 간격)에 서고, 기뻐하며 대사·이모티콘을 반복한다
+function startWalkers() {
+  const cardR = showCard.getBoundingClientRect();
+  const els = [...showCard.querySelectorAll(".pp")];
+  walkers = els.map((el, i) => {
+    const r = el.getBoundingClientRect(), cx = r.left + r.width / 2 - cardR.left, fromLeft = cx < cardR.width / 2;
+    const dist = fromLeft ? cx + r.width : cardR.width - cx + r.width;
+    const id = +el.dataset.id;
+    return { el, id, st: styleOf(id), cache: new Map(), g: el.querySelector("canvas").getContext("2d"), bub: el.querySelector(".bub"), emo: el.querySelector(".emo"),
+      x: fromLeft ? -dist : dist, from: fromLeft ? -dist : dist, delay: 0.15 + i * Math.min(0.28, 2.2 / Math.max(1, els.length)), dur: 1.3 + Math.abs(dist) / cardR.width * 1.4,
+      t: 0, arrived: false, next: 1 + Math.random() * 2, hop: 0, frameKey: "" };
+  });
+  let last = performance.now();
+  const tick = (ms) => {
+    const dt = Math.min(0.05, (ms - last) / 1000); last = ms;
+    let anyWalking = false;
+    for (const w of walkers) {
+      w.t += dt;
+      const u = Math.max(0, Math.min(1, (w.t - w.delay) / w.dur));
+      let dir = 2, step = 0, flip = w.from > 0, bob = 0;
+      if (u < 1) {
+        anyWalking = true;
+        w.x = w.from * (1 - u);
+        step = u > 0 ? Math.floor(w.t * 8) % 4 : 0;
+        bob = step % 2 ? -1 : 0;
+      } else {
+        if (!w.arrived) { w.arrived = true; w.el.classList.add("here"); w.hop = 0.5; w.next = 0.4 + Math.random() * 1.2; }
+        w.x = 0; dir = 0; flip = false;
+        // 기쁨 루프: 폴짝 + 대사 또는 이모티콘
+        w.next -= dt;
+        const party = showEl.classList.contains("s2");
+        if (w.next <= 0) {
+          w.hop = 0.55;
+          if (Math.random() < 0.5) { w.bub.textContent = choose(HAPPY); w.bub.classList.add("on"); clearTimeout(w.bt); w.bt = setTimeout(() => w.bub.classList.remove("on"), 1800); }
+          else { w.emo.textContent = choose(HAPPY_EMO); w.emo.classList.remove("on"); void w.emo.offsetWidth; w.emo.classList.add("on"); }
+          w.next = party ? 0.9 + Math.random() * 1.2 : 2.2 + Math.random() * 2.8;
+        }
+        if (party && Math.random() < dt * 2) w.hop = Math.max(w.hop, 0.4);
+      }
+      if (w.hop > 0) { w.hop -= dt; bob = -Math.round(Math.abs(Math.sin((0.55 - w.hop) / 0.55 * Math.PI)) * 4); }
+      w.el.style.transform = `translate(${w.x.toFixed(1)}px, ${bob * (w.el.offsetHeight / 40)}px)`;
+      w.el.classList.add("go");
+      const key = dir * 10 + step + (flip ? 100 : 0);
+      if (key !== w.frameKey) {
+        w.frameKey = key;
+        const img = spriteImage(w.st, dir, step, w.cache);
+        w.g.clearRect(0, 0, SW, SH); w.g.putImageData(img, 0, 0);
+        w.el.querySelector("canvas").style.transform = flip ? "scaleX(-1)" : "";
+      }
+    }
+    walkRaf = requestAnimationFrame(tick);
+  };
+  walkRaf = requestAnimationFrame(tick);
+  // 걸어 나오는 동안 발소리 느낌으로 박수
+  setTimeout(() => sfx.applause(3), 400);
 }
 function stepClass(step) { showEl.classList.remove("s0", "s1", "s2"); showEl.classList.add("s" + step); }
 function confettiRain() {
@@ -896,33 +1003,102 @@ function confettiRain() {
   box.innerHTML = Array.from({ length: 90 }, () => `<i style="left:${Math.random() * 100}%;background:${choose(cols)};animation-duration:${(2.2 + Math.random() * 2).toFixed(2)}s;animation-delay:${(Math.random() * 1.2).toFixed(2)}s"></i>`).join("");
   setTimeout(() => (box.innerHTML = ""), 5000);
 }
+async function closeCurtain() {
+  sfx.curtain(); showEl.classList.add("closed");
+  const done = curtain.close();
+  // 가운데서 거의 만나면 다음 단계로(완전히 멈출 때까지 기다리지 않음)
+  for (let i = 0; i < 60 && !curtain.closedEnough; i++) await wait(50);
+  await Promise.race([done, wait(900)]);
+}
+function openCurtain() { sfx.curtain(); showEl.classList.remove("closed"); return curtain.open(); }
 async function doShow(sh) {
   const isNew = sh && (!showCur || showCur.sid !== sh.sid);
   if (!sh) {
     if (!showCur) return;
     showCur = null;
-    sfx.curtain(); showEl.classList.add("closed"); await wait(1100);
+    await closeCurtain();
+    cancelAnimationFrame(walkRaf); walkRaf = 0; walkers = [];
     showEl.classList.remove("on", "s0", "s1", "s2"); showCard.innerHTML = "";
-    await wait(250); sfx.curtain(); showEl.classList.remove("closed");
+    await wait(300); openCurtain();
     return;
   }
   if (isNew) {
     showCur = { ...sh, step: 0 };
-    sfx.curtain(); showEl.classList.add("closed"); await wait(1100);
+    await closeCurtain();
     fillShow(sh); stepClass(0); showEl.classList.add("on");
     sfx.drumroll(1.1); await wait(1200);
-    sfx.curtain(); showEl.classList.remove("closed"); await wait(500); sfx.fanfare();
-    if (sh.step > 0) { await wait(900); }
+    openCurtain(); await wait(500); sfx.fanfare();
+    if (sh.step > 0) await wait(900);
     else return;
   }
   const prev = showCur.step ?? 0;
   showCur = sh;
   if (sh.step === prev && !isNew) return;
   stepClass(sh.step);
-  if (sh.step === 1 && prev < 1) { sfx.drumroll(0.7); setTimeout(() => sfx.applause(2.6), 700); }
+  if (sh.step >= 1 && prev < 1) { sfx.drumroll(0.7); await wait(80); startWalkers(); }
+  if (sh.step === 0) { cancelAnimationFrame(walkRaf); walkRaf = 0; walkers = []; showCard.querySelectorAll(".pp").forEach((e) => { e.classList.remove("here"); e.style.transform = ""; }); }
   if (sh.step === 2) { sfx.fanfare(); sfx.applause(3); confettiRain(); for (const id of sh.people) people.find((p) => p.d.id === id)?.emote("party"); }
 }
 function applyShow(sh) { showChain = showChain.then(() => doShow(sh)).catch(() => {}); }
+
+// ---------- 기본 메뉴: 시상식 준비 모드 ----------
+const CEO_NAME = "최근화";
+var ceremony = { on: false };
+function seatsFor(n) {
+  const out = [];
+  for (let y = 146; y <= 344 && out.length < n + 40; y += 19) {
+    const row = [];
+    for (let x = CX - 230; x <= CX + 230; x += 17) if (!blocked(x, y) && !blocked(x - 6, y) && !blocked(x + 6, y)) row.push({ x: x + ((y / 19) % 2 ? 8 : 0) * 0, y });
+    row.sort((a, b) => Math.abs(a.x - CX) - Math.abs(b.x - CX));
+    out.push(...row);
+  }
+  return out;
+}
+function vanishTree() {
+  const p = treeProp(), s = p.spr;
+  tree.gone = true;
+  for (let n = 0; n < 700; n++) {
+    const x = Math.floor(Math.random() * s.w), y = Math.floor(Math.random() * s.h), c = s.color[y * s.w + x];
+    if (!c) continue;
+    tree.dust.push({ x: p.x - s.ox + x, y: p.y - s.oy + y, vx: (Math.random() - 0.5) * 30, vy: -20 - Math.random() * 40, c, life: 0.8 + Math.random() * 1.2, t: -(1 - y / s.h) * 0.2 - Math.random() * 0.8, sp: true });
+  }
+  sfx.dust();
+}
+function seatEveryone() {
+  const crowd = people.filter((r) => !r.d.npc && r.d.name !== CEO_NAME);
+  crowd.sort(() => Math.random() - 0.5);
+  const seats = seatsFor(crowd.length);
+  crowd.forEach((r, i) => { const s = seats[i] || seats[seats.length - 1]; r.seat = { x: s.x, y: s.y }; r.state = "idle"; r.timer = Math.random() * 1.2; r.speech = null; });
+  const ceo = people.find((r) => r.d.name === CEO_NAME);
+  if (ceo) { ceo.seat = { x: CX - 26, y: 98, jump: true, jx: CX - 26, jy: 116, stand: true, face: 0 }; ceo.timer = 0; }
+  const [sa, de] = people.filter((r) => r.d.npc);
+  if (ride.t > 0) ride.t = 0.001;
+  if (sa) sa.seat = { x: CX - 70, y: 124, stand: true, face: 0 };
+  if (de) de.seat = { x: CX + 70, y: 124, stand: true, face: 0 };
+}
+function seatEveryoneOne(r) { r.seat = { x: CX - 26, y: 98, jump: true, jx: CX - 26, jy: 116, stand: true, face: 0 }; }
+function setCeremony(on) {
+  if (on === ceremony.on) return;
+  ceremony.on = on;
+  if (on) {
+    vanishTree();
+    seatEveryone();
+  } else {
+    for (const r of people) { if (r.seat) { r.seat = null; r.onStage = false; if (r.state === "sit") r.state = "idle"; r.timer = Math.random() * 2; r.hop = 0.5; } }
+    // 단상 위 사람은 내려온다
+    const ceo = people.find((r) => r.d.name === CEO_NAME);
+    if (ceo && ceo.y < 112) { ceo.y = 118; ceo.hop = 0.6; }
+    // 트리 자리에 앉아 있던 사람은 바깥으로 밀어낸다
+    for (const r of people) {
+      let k = 0;
+      while (blocked(r.x, r.y) && k++ < 60) { const an = Math.atan2(r.y - (FY + 12), r.x - CX) || 0; r.x += Math.cos(an) * 3; r.y += Math.sin(an) * 1.6 + (k > 30 ? 2 : 0); }
+    }
+    tree.gone = false; tree.bits = []; tree.boom = GROW_AT; sfx.regrow();
+    ride.cool = rnd(10, 20);
+  }
+}
+// 단상 위에 있는지(그리기 순서·그림자용)
+setInterval(() => { for (const r of people) r.onStage = !!(r.seat && r.seat.jump && r.y < 108); }, 200);
 
 // ---------- 명단 자동 스크롤 ----------
 function autoScroll(el) {
@@ -960,10 +1136,11 @@ connectLive({
   chat: onChat,
   emote: onEmote,
   show: applyShow,
+  mode: (m) => setCeremony(m === "ceremony"),
   status: (on) => { online = on; const el = $("#live"); el.textContent = on ? "● 실시간 연결됨" : "○ 연결 중…"; el.className = on ? "on" : ""; },
 });
 renderLists();
 if (params.get("arrive")) setTimeout(() => randomArrivals(+params.get("arrive"), true), 400);
 // 테스트용(서버에 아무것도 보내지 않음): ?debug 로 열면 콘솔에서 광장 캐릭터를 직접 움직일 수 있다
-if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride, explode: () => explodeTree(), leaveAll: () => { for (const id of [...present.keys()]) leave(id); }, show: (sh) => applyShow(sh) };
+if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride, explode: () => explodeTree(), leaveAll: () => { for (const id of [...present.keys()]) leave(id); }, show: (sh) => applyShow(sh), ceremony: (on) => setCeremony(on), arrive: (id, m) => arrive(id, m || "") };
 (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(tick));

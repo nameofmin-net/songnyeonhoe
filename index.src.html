@@ -15,6 +15,17 @@
   /* 시상식 무대: 빨간 커튼 */
   #stage { container-type: size; }
   #show { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+  #show .curtain { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  #show .pp { position: relative; visibility: hidden; }
+  #show .pp.go { visibility: visible; }
+  #show .pp canvas { height: var(--ph, 15cqh); aspect-ratio: 18 / 28; image-rendering: pixelated; filter: drop-shadow(0 0 1.2cqw #ffd84a55); display: block; }
+  #show .pp b { opacity: 0; transition: opacity .4s; }
+  #show .pp.here b { opacity: 1; }
+  #show .pp .bub { position: absolute; bottom: calc(100% + .6cqh); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: var(--pf, 2.2cqw); background: #fff; color: #1c1624; padding: .4cqh .9cqw; box-shadow: 0 0 0 .25cqw #1c1624; opacity: 0; transition: opacity .25s, transform .25s; z-index: 2; }
+  #show .pp .bub.on { opacity: 1; transform: translateX(-50%) translateY(-.5cqh); }
+  #show .pp .emo { position: absolute; left: 50%; top: -1cqh; font-size: calc(var(--pf, 2.2cqw) * 1.6); transform: translateX(-50%); opacity: 0; pointer-events: none; }
+  #show .pp .emo.on { animation: emoUp 1.4s cubic-bezier(.22,1,.36,1) forwards; }
+  @keyframes emoUp { 0% { opacity: 0; transform: translate(-50%, 1cqh) scale(.6); } 20% { opacity: 1; transform: translate(-50%, -2cqh) scale(1); } 100% { opacity: 0; transform: translate(-50%, -7cqh) scale(1); } }
   #show .cur { position: absolute; top: 0; bottom: 0; width: 51%; transition: transform 1.05s cubic-bezier(.65,0,.35,1);
     background: linear-gradient(180deg, #0000 0 88%, #0006 100%), repeating-linear-gradient(90deg, #6a0a12 0 1.2%, #a8141f 1.2% 3.4%, #d8323a 3.4% 4.6%, #b81d2a 4.6% 6.4%, #7a0d16 6.4% 7.6%); }
   #show .cur.l { left: 0; transform: translateX(-112%); box-shadow: inset -1.2cqw 0 1.5cqw #0008; }
@@ -34,16 +45,14 @@
   #show .sh-t small { display: block; font-size: 2.1cqw; color: #ffc2dc; letter-spacing: .3em; margin-bottom: 1.2cqh; text-shadow: none; font-weight: normal; }
   #show .sh-s { font-size: 3.6cqw; color: #fff; padding: .8cqh 3cqw; border: .35cqw solid #ffd84a; background: #1c1624cc; display: none; }
   #show .ppl { display: none; flex-wrap: wrap; justify-content: center; gap: 1.6cqh 2.2cqw; max-width: 92cqw; }
-  #show .pp { display: flex; flex-direction: column; align-items: center; gap: .6cqh; opacity: 0; transform: translateY(2cqh) scale(.6); }
+  #show .pp { display: flex; flex-direction: column; align-items: center; gap: .6cqh; }
   #show .pp img { height: var(--ph, 15cqh); image-rendering: pixelated; filter: drop-shadow(0 0 1.2cqw #ffd84a66); }
   #show .pp b { font-size: var(--pf, 2.2cqw); font-weight: normal; background: #1c1624dd; padding: .2cqh .8cqw; }
   #show .pp b small { color: #9a90b0; margin-left: .4cqw; font-size: .8em; }
   #show.s1 .sh-t, #show.s2 .sh-t { font-size: 4.6cqw; }
   #show.s1 .sh-s, #show.s2 .sh-s { display: block; animation: shIn .6s cubic-bezier(.25,1,.5,1) both; }
   #show.s1 .ppl, #show.s2 .ppl { display: flex; }
-  #show.s1 .pp, #show.s2 .pp { animation: ppIn .55s cubic-bezier(.22,1,.36,1) forwards; }
-  #show.s2 .pp img { animation: ppHop .5s ease-in-out infinite alternate; }
-  #show .sh-congrats { display: none; font-size: 3.4cqw; color: #ff8ad8; }
+  #show .sh-congrats { display: none; position: absolute; left: 0; right: 0; bottom: -1cqh; font-size: 3.2cqw; color: #ff8ad8; text-shadow: 0 .3cqw 0 #1c1624; }
   #show.s2 .sh-congrats { display: block; animation: shIn .5s cubic-bezier(.25,1,.5,1) both; }
   #show .sh-conf { position: absolute; inset: 0; }
   #show .sh-conf i { position: absolute; top: -4%; width: 1.1cqw; height: 1.8cqh; animation: fall linear forwards; }
@@ -141,7 +150,7 @@
     <div id="stage">
       <canvas id="world"></canvas><canvas id="overlay"></canvas>
       <div id="announce"></div>
-      <div id="show"><div class="sh-back"></div><div class="sh-card"></div><div class="sh-conf"></div><div class="cur l"></div><div class="cur r"></div><div class="valance"></div></div>
+      <div id="show"><div class="sh-back"></div><div class="sh-card"></div><div class="sh-conf"></div><canvas class="curtain"></canvas><div class="valance"></div></div>
     </div>
     <div class="col right">
       <section class="panel chat">

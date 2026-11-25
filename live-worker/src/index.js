@@ -51,7 +51,8 @@ export class Room extends DurableObject {
     ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS menus (sid INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, title TEXT NOT NULL, sub TEXT NOT NULL, people TEXT NOT NULL, at INTEGER NOT NULL)");
     this.lastChat = new Map();
     this.show = null;
-    ctx.blockConcurrencyWhile(async () => { this.show = (await ctx.storage.get("show")) || null; });
+    this.mode = null;
+    ctx.blockConcurrencyWhile(async () => { this.show = (await ctx.storage.get("show")) || null; this.mode = (await ctx.storage.get("mode")) || null; });
   }
   menus() {
     return this.ctx.storage.sql.exec("SELECT sid, name, title, sub, people, at FROM menus ORDER BY sid").toArray().map((m) => ({ ...m, people: JSON.parse(m.people || "[]") }));
@@ -78,6 +79,7 @@ export class Room extends DurableObject {
       server.send(JSON.stringify({ type: "state", attendees: this.list() }));
       server.send(JSON.stringify({ type: "chatlog", items: this.chatlog() }));
       server.send(JSON.stringify({ type: "show", show: this.show }));
+      server.send(JSON.stringify({ type: "mode", mode: this.mode }));
       return new Response(null, { status: 101, webSocket: client });
     }
     if (path === "/api/state" && req.method === "GET") return json(req, { attendees: this.list() });
@@ -144,10 +146,17 @@ export class Room extends DurableObject {
       return json(req, { ok: true });
     }
     // ---------- 어드민 컨트롤러: 시상 메뉴 만들기 · 재생 ----------
-    if (path.startsWith("/api/menu") || path === "/api/show") {
+    if (path.startsWith("/api/menu") || path === "/api/show" || path === "/api/mode") {
       if (!this.admin(req)) return json(req, { error: "forbidden" }, 403);
       const txt = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
-      if (path === "/api/menus") return json(req, { ok: true, menus: this.menus(), show: this.show });
+      if (path === "/api/menus") return json(req, { ok: true, menus: this.menus(), show: this.show, mode: this.mode });
+      // 기본 메뉴: 시상식 준비 모드(모두 앉아서 단상을 봄)
+      if (path === "/api/mode") {
+        this.mode = body.mode === "ceremony" ? "ceremony" : null;
+        await this.ctx.storage.put("mode", this.mode);
+        this.broadcast({ type: "mode", mode: this.mode });
+        return json(req, { ok: true, mode: this.mode });
+      }
       if (path === "/api/menu/save") {
         const name = txt(body.name, 30), title = txt(body.title, 40), sub = txt(body.sub, 60);
         const people = [...new Set((Array.isArray(body.people) ? body.people : []).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < MAX))].slice(0, 60);

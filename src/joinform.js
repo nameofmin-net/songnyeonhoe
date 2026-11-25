@@ -66,6 +66,7 @@ export function connectLive(h) {
       else if (m.type === "chat") h.chat?.(m);
       else if (m.type === "emote") h.emote?.(m);
       else if (m.type === "show") h.show?.(m.show);
+      else if (m.type === "mode") h.mode?.(m.mode);
     };
     ws.onclose = () => { clearInterval(ping); h.status?.(false); setTimeout(open, wait); wait = Math.min(wait * 2, 15000); };
     ws.onerror = () => { try { ws.close(); } catch {} };
