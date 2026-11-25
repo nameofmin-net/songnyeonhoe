@@ -1,5 +1,5 @@
 // 입장(메인 팝업 · 모바일 입장 페이지 공용): 이름+한마디 입장 → 내 캐릭터(복장·한마디 수정)
-import { makePopulation, renderSprite, applyStyle, optionsFor, LABELS, SW, SH } from "./characters.js";
+import { makePopulation, renderSprite, applyStyle, optionsFor, LABELS, SW, SH, isDress, FIXED_TOPS } from "./characters.js";
 
 import { ROSTER } from "./roster.js";
 export const ALL = makePopulation(0, 2026, ROSTER);
@@ -355,7 +355,7 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
     timer = setInterval(paint, 160); paint();
     const drawParts = () => {
       const st = cur();
-      parts.innerHTML = PARTS.filter(([k]) => !(k === "hatColor" && st.hat === "none") && !(k === "accColor" && !["headphones", "backpack"].includes(st.acc)) && !(k === "bottom" && st.top === "dress"))
+      parts.innerHTML = PARTS.filter(([k]) => !(k === "hatColor" && st.hat === "none") && !(k === "accColor" && !["headphones", "backpack", "scarf"].includes(st.acc)) && !(k === "bottom" && isDress(st.top)) && !((k === "topColor" || k === "top2") && FIXED_TOPS.includes(st.top)))
         .map(([k, name, kind]) => `<div class="opt"><span>${name}</span><div class="chips">${
           opt[k].map((v) => kind === "chip"
             ? `<button class="chip ${st[k] === v ? "on" : ""}" data-k="${k}" data-v="${v}">${LABELS[k]?.[v] ?? v}</button>`
@@ -365,7 +365,7 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
     parts.addEventListener("click", (e) => {
       const b = e.target.closest("[data-k]"); if (!b) return;
       draft = { ...draft, [b.dataset.k]: b.dataset.v };
-      if (b.dataset.k === "top" && b.dataset.v !== "dress" && cur().bottom === "dress") draft.bottom = optionsFor(d.style.gender).bottom[0];
+      if (b.dataset.k === "top" && !isDress(b.dataset.v) && cur().bottom === "dress") draft.bottom = optionsFor(d.style.gender).bottom[0];
       out.textContent = ""; drawParts();
     });
     const counter = () => (cnt.textContent = `${ta.value.length} / 40`);

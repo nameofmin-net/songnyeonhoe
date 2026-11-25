@@ -19,6 +19,11 @@ const TOP_M = ["tee", "long", "hoodie", "stripe", "jacket", "shirt", "overall"];
 const TOP_F = ["tee", "long", "hoodie", "stripe", "jacket", "blouse", "dress", "overall"];
 const BOT_M = ["pants", "jeans", "shorts"];
 const BOT_F = ["pants", "jeans", "shorts", "skirt", "longskirt"];
+// 크리스마스 코스튬(꾸미기 전용). santa·elf·santadress는 정해진 색으로 그린다.
+const XTOP_M = ["santa", "elf", "xsweater"], XTOP_F = ["santa", "santadress", "elf", "xsweater"];
+const XHATS = ["santa", "antler", "elfhat"], XACCS = ["rednose", "scarf"];
+export const FIXED_TOPS = ["santa", "elf", "santadress"];
+export const isDress = (top) => top === "dress" || top === "santadress";
 const HATS = ["none", "none", "none", "none", "cap", "beanie"];
 const ACCS = ["none", "none", "none", "glasses", "sunglasses", "headphones", "backpack"];
 
@@ -183,6 +188,33 @@ function paintHair(g, st, dir, back) {
 function paintHat(g, st, dir) {
   if (st.hat === "none") return;
   const C = hex(st.hatColor), D = shadeC(C, 0.72), L = shadeC(C, 1.2), M = 8;
+  const W = hex("#f6f2ea"), RED = hex("#d8323a"), RD = shadeC(RED, 0.72);
+  if (st.hat === "santa") {
+    // 빨간 고깔이 오른쪽으로 처지고 끝에 하얀 방울
+    g.rows([[1, 6, 11], [2, 5, 12], [3, 4, 13], [4, 4, 13], [5, 4, 13]], RED, M);
+    g.rows([[0, 9, 12], [1, 12, 14], [2, 13, 14]], RED, M);
+    g.set(10, 1, RD, M); g.set(13, 2, RD, M);
+    g.rect(14, 3, 15, 4, W, M); g.set(15, 2, W, M);
+    g.rows([[6, 4, 13]], W, M);
+    if (dir !== 1) g.set(7, 2, shadeC(RED, 1.2), M);
+    return;
+  }
+  if (st.hat === "elfhat") {
+    const G = hex("#3fa052");
+    g.rows([[0, 12, 13], [1, 10, 13], [2, 8, 12], [3, 6, 12], [4, 5, 13], [5, 4, 13]], G, M);
+    g.rows([[6, 4, 13]], RED, M);
+    g.set(14, 0, hex("#ffd84a"), M); g.set(14, 1, hex("#e0a92a"), M);
+    if (dir !== 1) g.set(7, 4, shadeC(G, 1.2), M);
+    return;
+  }
+  if (st.hat === "antler") {
+    // 루돌프 뿔 머리띠
+    const A = hex("#9a6a3e"), AL = hex("#c48a52"), HB = hex("#d8323a");
+    const left = [[5, 3], [5, 2], [4, 1], [4, 0], [3, 2], [2, 1], [6, 1]], right = left.map(([x, y]) => [17 - x, y]);
+    if (dir === 2) { for (const [x, y] of left) g.set(x + 3, y, A, M); g.set(7, 0, AL, M); g.hline(3, [6, 7, 8, 9, 10], HB, M); }
+    else { for (const [x, y] of [...left, ...right]) g.set(x, y, A, M); g.set(4, 0, AL, M); g.set(13, 0, AL, M); g.hline(3, [6, 7, 8, 9, 10, 11], HB, M); }
+    return;
+  }
   if (st.hat === "beanie") {
     g.rows([[1, 7, 10], [2, 5, 12], [3, 4, 13], [4, 4, 13], [5, 4, 13]], C, M);
     g.rows([[6, 4, 13]], D, M);
@@ -231,6 +263,19 @@ function paintAcc(g, st, dir, layer) {
     return;
   }
   if (layer !== "front") return;
+  if (a === "scarf") {
+    const C = hex(st.accColor), D = shadeC(C, 0.72), L = shadeC(C, 1.22);
+    if (dir === 0) { g.rows([[14, 5, 12]], C, 6); g.hline(14, [6, 9, 12], L, 6); g.rect(10, 15, 11, 17, C, 6); g.hline(17, [10, 11], D, 6); }
+    else if (dir === 1) { g.rows([[14, 5, 12]], C, 6); g.rect(7, 15, 8, 17, D, 6); }
+    else { g.rows([[14, 6, 11]], C, 6); g.hline(14, [7, 10], L, 6); g.rect(5, 15, 5, 17, D, 6); }
+    return;
+  }
+  if (a === "rednose") {
+    const N = hex("#ff3b3b");
+    if (dir === 0) { g.rect(8, 11, 9, 11, N, 7); g.set(8, 10, hex("#ffb0a8"), 7); }
+    if (dir === 2) { g.set(14, 10, N, 7); g.set(15, 10, N, 7); g.set(14, 11, shadeC(N, 0.8), 7); }
+    return;
+  }
   if (a === "glasses" && dir === 0) {
     g.hline(8, [5, 6, 7, 10, 11, 12], F, 7); g.set(5, 9, F, 7); g.set(7, 9, F, 7); g.set(10, 9, F, 7); g.set(12, 9, F, 7);
     g.hline(10, [5, 7, 10, 12], F, 7); g.hline(9, [8, 9], F, 7);
@@ -246,9 +291,12 @@ function paintAcc(g, st, dir, layer) {
 }
 
 function paintBody(g, st, dir, step) {
-  const skin = hex(st.skin), T = hex(st.topColor), T2 = hex(st.top2), B = hex(st.bottomColor), S = hex(st.shoes);
   const top = st.top, bot = st.bottom;
-  const longSleeve = top === "long" || top === "hoodie" || top === "jacket" || top === "shirt";
+  const XR = hex("#d8323a"), XG = hex("#3fa052"), XW = hex("#f6f2ea"), XK = hex("#2a2230"), XY = hex("#f2c84b");
+  const skin = hex(st.skin), B = hex(st.bottomColor), S = top === "elf" ? XG : hex(st.shoes);
+  const T = top === "santa" || top === "santadress" ? XR : top === "elf" ? XG : hex(st.topColor), T2 = hex(st.top2);
+  const longSleeve = ["long", "hoodie", "jacket", "shirt", "santa", "elf", "xsweater", "santadress"].includes(top);
+  const cuff = top === "santa" || top === "santadress" ? XW : top === "elf" ? XR : top === "xsweater" ? XW : 0;
   // 다리 (걸음: 1 = 왼발 들림, 3 = 오른발 들림)
   const legC = bot === "shorts" || bot === "skirt" ? skin : B;
   const legY1 = 25;
@@ -273,6 +321,7 @@ function paintBody(g, st, dir, step) {
   if (bot === "longskirt") g.rows([[20, 5, 12], [21, 5, 12], [22, 4, 13], [23, 4, 13], [24, 4, 13], [25, 3, 14]], B, 4);
   if (bot === "pants" || bot === "jeans" || bot === "shorts") g.rect(6, 20, 11, 20, B, 4);
   if (bot === "dress") g.rows([[20, 5, 12], [21, 5, 12], [22, 4, 13], [23, 4, 13], [24, 3, 14]], T, 3);
+  if (bot === "dress" && top === "santadress") g.rows([[24, 3, 14]], XW, 6);
 
   // 몸통
   const tx0 = dir === 2 ? 6 : 5, tx1 = dir === 2 ? 11 : 12;
@@ -307,9 +356,34 @@ function paintBody(g, st, dir, step) {
     if (top === "dress") g.rect(5, 19, 12, 19, T2, 6);
   }
 
+  // 크리스마스 코스튬 디테일
+  const side = dir === 2, x0 = side ? 6 : 5, x1 = side ? 11 : 12;
+  if (top === "santa" || top === "santadress") {
+    g.rect(x0, 18, x1, 18, XK, 6);
+    if (dir === 0) { g.rect(8, 18, 9, 18, XY, 6); g.rect(8, 14, 9, 17, XW, 6); g.rect(6, 14, 11, 14, XW, 6); }
+    if (side) { g.set(11, 18, XY, 6); g.rect(7, 14, 10, 14, XW, 6); }
+    if (dir === 1) g.rect(6, 14, 11, 14, XW, 6);
+    if (top === "santa") { g.rect(x0, 20, x1, 20, XW, 6); if (dir === 0) g.rect(8, 19, 9, 19, XW, 6); }
+  }
+  if (top === "elf") {
+    g.rect(side ? 7 : 6, 14, side ? 10 : 11, 14, XR, 6);
+    if (!side) g.hline(15, dir === 0 ? [6, 8, 9, 11] : [6, 8, 9, 11], XR, 6); else g.hline(15, [7, 9], XR, 6);
+    g.rect(x0, 18, x1, 18, XK, 6);
+    if (dir === 0) g.rect(8, 18, 9, 18, XY, 6); else if (side) g.set(11, 18, XY, 6);
+    for (let x = x0; x <= x1; x += 2) g.set(x, 20, XR, 6);
+    for (let x = x0 + 1; x <= x1; x += 2) g.set(x, 20, T, 3);
+  }
+  if (top === "xsweater") {
+    g.rect(side ? 7 : 6, 14, side ? 10 : 11, 14, XW, 6);
+    for (let x = x0; x <= x1; x += 2) { g.set(x, 15, XW, 6); g.set(x + 1, 19, XW, 6); }
+    if (dir === 0) { g.set(8, 16, XY, 6); g.set(9, 16, XG, 6); g.rect(7, 17, 10, 17, XG, 6); g.rect(8, 18, 9, 18, XG, 6); g.set(7, 17, XG, 6); g.set(10, 17, hex("#ff5a5a"), 6); }
+    else g.hline(17, side ? [7, 9, 11] : [6, 8, 10, 12], XW, 6);
+  }
+
   // 팔
   const sleeve = (x, y0) => {
     for (let y = y0; y <= y0 + 4; y++) g.set(x, y, longSleeve || y < y0 + 2 ? T : skin, longSleeve || y < y0 + 2 ? 3 : 1);
+    if (cuff) g.set(x, y0 + 4, cuff, 6);
     g.set(x, y0 + 5, skin, 1);
   };
   if (dir === 2) {
@@ -317,6 +391,7 @@ function paintBody(g, st, dir, step) {
     // 팔 하나, 앞뒤로 흔듦
     for (let y = 15; y <= 19; y++) g.set(9 + (y > 17 ? sw : 0), y, longSleeve || y < 17 ? shadeC(T, 0.88) : skin, longSleeve || y < 17 ? 3 : 1);
     g.set(9 + sw, 20, skin, 1);
+    if (cuff) g.set(9 + sw, 19, cuff, 6);
     g.set(8, 15, shadeC(T, 0.88), 3);
   } else {
     const l = step === 1 ? 1 : step === 3 ? -1 : 0;
@@ -381,19 +456,19 @@ export function actorFor(sprite) {
 const uniq = (a) => [...new Set(a)];
 export const LABELS = {
   hair: { short: "짧은머리", side: "옆가르마", parted: "가르마", spiky: "삐죽머리", buzz: "버즈컷", mid: "중단발", curly: "곱슬", long: "긴머리", wavy: "웨이브", bob: "단발", pixie: "숏컷", pony: "포니테일", twin: "양갈래", bun: "똥머리" },
-  top: { tee: "티셔츠", long: "긴팔", hoodie: "후드티", stripe: "줄무늬", jacket: "재킷", shirt: "셔츠", blouse: "블라우스", overall: "멜빵", dress: "원피스" },
+  top: { tee: "티셔츠", long: "긴팔", hoodie: "후드티", stripe: "줄무늬", jacket: "재킷", shirt: "셔츠", blouse: "블라우스", overall: "멜빵", dress: "원피스", santa: "🎅 산타 코트", santadress: "🎅 산타 원피스", elf: "🧝 요정 옷", xsweater: "🎄 크리스마스 니트" },
   bottom: { pants: "바지", jeans: "청바지", shorts: "반바지", skirt: "치마", longskirt: "롱스커트", dress: "원피스" },
-  hat: { none: "없음", cap: "캡모자", beanie: "비니" },
-  acc: { none: "없음", glasses: "안경", sunglasses: "선글라스", headphones: "헤드폰", backpack: "백팩" },
+  hat: { none: "없음", cap: "캡모자", beanie: "비니", santa: "🎅 산타 모자", antler: "🦌 루돌프 뿔", elfhat: "🧝 요정 모자" },
+  acc: { none: "없음", glasses: "안경", sunglasses: "선글라스", headphones: "헤드폰", backpack: "백팩", rednose: "🔴 루돌프 코", scarf: "🧣 목도리" },
 };
 /** 성별에 맞는 선택지. 헤어는 모두에게 열어 둔다. */
 export function optionsFor(gender) {
   return {
     hair: uniq([...HAIR_M, ...HAIR_F]),
-    top: gender === "M" ? TOP_M : TOP_F,
+    top: gender === "M" ? [...TOP_M, ...XTOP_M] : [...TOP_F, ...XTOP_F],
     bottom: gender === "M" ? BOT_M : BOT_F,
-    hat: uniq(HATS),
-    acc: uniq(ACCS),
+    hat: [...uniq(HATS), ...XHATS],
+    acc: [...uniq(ACCS), ...XACCS],
     skin: SKINS,
     hairColor: HAIR_COLORS,
     topColor: CLOTH,
@@ -411,7 +486,7 @@ export function applyStyle(base, ov = {}) {
     const list = opt[k];
     if (list && list.map((x) => x.toLowerCase()).includes(String(v).toLowerCase())) st[k] = list.find((x) => x.toLowerCase() === String(v).toLowerCase());
   }
-  if (st.top === "dress") st.bottom = "dress";
+  if (isDress(st.top)) st.bottom = "dress";
   else if (st.bottom === "dress") st.bottom = base.bottom === "dress" ? "pants" : base.bottom;
   return st;
 }
