@@ -21,6 +21,19 @@ export const floatOf = (sp, t) => (sp === "angel" ? 2 + Math.round(Math.sin(t * 
 export function drawSpecial(p, sp, layer, o) {
   if (!sp || sp === "none") return;
   const { x0, y0, cx, fy, t } = o, s = o.seed || 0;
+  if (sp === "npcdeer") {
+    // 빨간 코가 반짝반짝 (앞·옆에서만)
+    if (layer !== "front" || o.dir === 1) return;
+    const nx = o.dir === 2 ? (o.flip ? x0 + SW - 1 - 15.5 : x0 + 15.5) : x0 + 8.5, ny = y0 + (o.dir === 2 ? 10.5 : 11);
+    const k = 0.5 + 0.5 * Math.sin(t * 5);
+    p.glow(nx, ny, 4 + k * 2, hex("#ff3b3b"), 0.22 + 0.2 * k);
+    if (k > 0.92) sparkle(p, nx, ny - 1, 2, WHITE, hex("#ffb0a8"), 0.3);
+    return;
+  }
+  if (sp === "npcsanta") {
+    if (layer === "back") p.glow(cx, y0 + 16, 14, hex("#ff8a6a"), 0.08);
+    return;
+  }
   if (sp === "gold") {
     if (layer === "back") { p.glow(cx, y0 + 15, 15, GOLD, 0.16 + 0.06 * Math.sin(t * 3)); return; }
     // 반짝이 6개가 돌아가며 번쩍

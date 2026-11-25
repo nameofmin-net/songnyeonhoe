@@ -27,7 +27,7 @@ export const FIXED_TOPS = ["santa", "elf", "santadress"];
 export const SPECIALS = ["none", "gold", "disco", "tree", "neon", "angel"];
 function specialize(st) {
   const sp = st.sp;
-  if (!sp || sp === "none") return st;
+  if (!sp || sp === "none" || sp.startsWith("npc")) return st;
   const o = { ...st, hat: "none" };
   if (sp === "gold") Object.assign(o, { top: "jacket", topColor: "#f2c84b", top2: "#fff0a0", bottom: "pants", bottomColor: "#d9a92a", shoes: "#f2c84b", acc: "sunglasses" });
   if (sp === "disco") Object.assign(o, { top: "jacket", topColor: "#c9cdd8", top2: "#ff5ac8", bottom: "pants", bottomColor: "#a9adbb", shoes: "#f4f1ea", acc: "sunglasses" });
@@ -38,6 +38,39 @@ function specialize(st) {
 }
 function paintSpecial(g, st, dir) {
   const sp = st.sp;
+  if (sp === "npcsanta") {
+    // 흰 수염 + 등에 선물 자루
+    const W = hex("#f6f2ea"), WD = hex("#d8d4cc"), SK = hex("#9a6a3e"), SKD = hex("#7a4e2a");
+    if (dir === 0) {
+      g.rows([[11, 4, 13], [12, 4, 13], [13, 5, 12], [14, 6, 11], [15, 7, 10]], W, 6);
+      g.hline(11, [7, 10], WD, 6); g.hline(10, [6, 7, 10, 11], W, 6); g.hline(12, [8, 9], hex("#c0645a"), 7);
+      g.hline(15, [7, 10], WD, 6);
+      g.rows([[12, 14, 15], [13, 14, 16]], SK, 6); g.set(15, 11, SKD, 6);
+    } else if (dir === 2) {
+      g.rows([[10, 12, 14], [11, 10, 14], [12, 9, 14], [13, 9, 13], [14, 10, 12]], W, 6); g.set(14, 10, hex("#f6cfae"), 1);
+      g.rows([[12, 1, 4], [13, 1, 5], [14, 1, 5], [15, 1, 5], [16, 1, 5], [17, 2, 5], [18, 2, 4]], SK, 6); g.hline(11, [2, 3], SKD, 6);
+      g.hline(16, [1, 2], SKD, 6);
+    } else {
+      g.rows([[11, 4, 13], [12, 3, 14], [13, 3, 14], [14, 3, 14], [15, 3, 14], [16, 3, 14], [17, 4, 13], [18, 4, 13]], SK, 6);
+      g.hline(11, [7, 8, 9, 10], SKD, 6); g.rows([[10, 8, 9]], hex("#d8323a"), 6);
+      g.hline(15, [4, 5, 12, 13], SKD, 6);
+    }
+  }
+  if (sp === "npcdeer") {
+    const C = hex("#e9d8b8"), E = hex("#8a5a33"), N = hex("#ff3b3b"), BELL = hex("#ffd84a");
+    // 귀
+    if (dir !== 2) { g.rows([[5, 2, 3], [6, 2, 3]], E, 8); g.rows([[5, 14, 15], [6, 14, 15]], E, 8); g.set(3, 6, C, 8); g.set(14, 6, C, 8); }
+    else g.rows([[5, 5, 6], [6, 4, 6]], E, 8);
+    // 주둥이 · 배 · 방울 목걸이
+    g.rect(dir === 2 ? 6 : 5, 14, dir === 2 ? 11 : 12, 14, hex("#d8323a"), 6);
+    if (dir === 0) {
+      g.rows([[11, 7, 10], [12, 6, 11], [13, 7, 10]], C, 6); g.rect(8, 11, 9, 11, N, 7); g.set(8, 10, hex("#ffb0a8"), 7); g.hline(12, [8, 9], hex("#5a3a2a"), 7);
+      g.rows([[16, 7, 10], [17, 7, 10], [18, 7, 10], [19, 8, 9]], C, 6); g.set(8, 15, BELL, 6); g.set(9, 15, BELL, 6);
+    } else if (dir === 2) {
+      g.rows([[11, 12, 14], [12, 11, 15]], C, 6); g.set(15, 10, N, 7); g.set(16, 10, N, 7); g.set(15, 11, N, 7); g.set(13, 12, hex("#5a3a2a"), 7);
+      g.rows([[16, 10, 11], [17, 10, 11], [18, 10, 11]], C, 6); g.set(11, 15, BELL, 6);
+    } else { g.rows([[19, 8, 9], [20, 8, 9]], C, 6); }
+  }
   if (sp === "gold") {
     // 왕관
     const G = hex("#ffd84a"), GD = hex("#d9a92a");

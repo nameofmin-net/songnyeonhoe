@@ -224,7 +224,7 @@ const FX = { charmed, sleep, confused, stunned };
 
 class Resident {
   constructor(d, message = "") {
-    this.d = d; this.name = d.name; this.style = styleOf(d.id); this.message = message;
+    this.d = d; this.name = d.name; this.style = d.npc ? d.style : styleOf(d.id); this.message = message;
     this.cache = new Map();
     this.actor = actorFor(this.sprite(0, 0, false));
     let x, y;
@@ -240,7 +240,7 @@ class Resident {
     if (!s) this.cache.set(k, (s = renderSprite(this.style, dir, step, blink)));
     return s;
   }
-  get busy() { return this.state === "chat" || this.fx.some((f) => f.loop); }
+  get busy() { return this.state === "chat" || this.state === "ride" || this.fx.some((f) => f.loop); }
   say(text, dur) { this.speech = { text, until: performance.now() / 1000 + (dur ?? 2.4 + text.length * 0.09) }; }
   pop(kind) { this.icon = { kind: kind ?? choose(ICON_KEYS), t: 0, dur: rnd(1.8, 2.8) }; }
   play(mod, loop, dur) {
@@ -249,6 +249,8 @@ class Resident {
   }
   react() {
     const r = Math.random();
+    if (this.state === "ride") { this.say(choose(this.d.rideLines || this.d.lines || LINES)); return; }
+    if (this.d.npc && r < 0.6) { this.say(choose(this.d.lines)); if (Math.random() < 0.4) this.play(confetti, false); this.hop = 0.7; return; }
     if (r < 0.34) this.say(this.message && Math.random() < 0.35 ? this.message : choose(LINES));
     else if (r < 0.62) this.pop();
     else if (r < 0.74) { this.play(exclamation, false); }
@@ -291,6 +293,7 @@ class Resident {
       return;
     }
 
+    if (this.state === "ride") return; // 업혀 가는 중: 위치는 npcRide()가 정한다
     if (this.state === "walk") {
       const dx = this.tx - this.x, dy = this.ty - this.y, d = Math.hypot(dx, dy);
       if (d < 1.5) { this.state = "idle"; this.timer = rnd(1.2, 4.5); if (Math.random() < 0.55) this.dir = 0; if (Math.random() < 0.6) this.react(); return; }
@@ -298,13 +301,13 @@ class Resident {
       let nx = this.x + vx * dt, ny = this.y + vy * dt;
       // 살짝 서로 비켜가기
       for (const o of people) {
-        if (o === this) continue;
+        if (o === this || o.state === "ride") continue;
         const ex = nx - o.x, ey = (ny - o.y) * 1.6, e = Math.hypot(ex, ey);
         if (e > 0 && e < 10) { nx += (ex / e) * 12 * dt; ny += (ey / e) * 8 * dt; }
       }
       if (!blocked(nx, ny)) { this.x = nx; this.y = ny; } else { this.state = "idle"; this.timer = rnd(0.3, 1); }
       if (Math.abs(vx) > Math.abs(vy) * 0.9) { this.dir = 2; this.flip = vx < 0; } else this.dir = vy > 0 ? 0 : 1;
-      if (Math.random() < dt * 0.04) this.say(choose(LINES));
+      if (Math.random() < dt * (this.d.npc ? 0.09 : 0.04)) this.say(choose(this.d.lines || LINES));
     } else if (this.state === "chat") {
       if ((this.timer -= dt) <= 0) { this.state = "idle"; this.timer = rnd(0.5, 1.5); }
     } else {
@@ -322,6 +325,7 @@ class Resident {
   /** 휴대폰에서 누른 이모티콘을 광장에서 몸으로 보여준다 */
   emote(kind) {
     if (this.hidden) return;
+    if (this.state === "ride") { if (kind === "cheers") this.play(beer, false); return; }
     this.state = "idle"; this.dir = 0; this.flip = false; this.pending = null;
     const hold = (t) => (this.timer = Math.max(this.timer, t));
     if (kind === "cheers") { this.play(beer, false); this.hop = 0.5; hold(1.9); }
@@ -363,11 +367,14 @@ class Resident {
     if (this.dance > 0) bob = Math.round(Math.abs(Math.sin(this.t * Math.PI * 5)) * 3);
     const sp = this.style.sp;
     bob += floatOf(sp, this.t);
+    if (this.d.hoppy && walking) bob += Math.round(Math.abs(Math.sin(this.t * 9)) * (this.carrying ? 3 : 2));
+    this.lastBob = bob;
+    if (this.state === "ride") bob = (this.lift || 0) + (this.mount?.lastBob || 0);
     const x0 = Math.round(this.x) - SW / 2, y0 = Math.round(this.y) - SH - bob;
-    this.spo = sp && sp !== "none" ? { x0, y0, cx: Math.round(this.x), fy: Math.round(this.y), t: this.t, spr, flip: this.flip, seed: this.d.id } : null;
+    this.spo = sp && sp !== "none" ? { x0, y0, cx: Math.round(this.x), fy: Math.round(this.y), t: this.t, spr, flip: this.flip, dir: this.dir, seed: Math.abs(this.d.id) } : null;
     // 그림자
     const p = painterFor(frame);
-    for (let dx = -6; dx <= 6; dx++) for (let dy = -1; dy <= 1; dy++) if ((dx / 6.5) ** 2 + dy * dy < 1.2) p.blendPx(Math.round(this.x) + dx, Math.round(this.y) + dy - 1, 0xff1a1222, 0.45);
+    if (this.state !== "ride") for (let dx = -6; dx <= 6; dx++) for (let dy = -1; dy <= 1; dy++) if ((dx / 6.5) ** 2 + dy * dy < 1.2) p.blendPx(Math.round(this.x) + dx, Math.round(this.y) + dy - 1, 0xff1a1222, 0.45);
     for (const f of this.fx) f.fx.draw(frame, "back");
     if (this.spo) drawSpecial(painterFor(frame), this.style.sp, "back", this.spo);
     blit(spr, SW, SH, x0, y0, this.flip);
@@ -471,19 +478,19 @@ function drawOverlay() {
   // 이름표
   c.font = `${small}px Galmuri11, "Apple SD Gothic Neo", sans-serif`;
   for (const r of list) {
-    if (r.hidden) continue;
+    if (r.hidden || r.state === "ride") continue;
     const x = r.x * S, y = (r.y + 3) * S + small * 0.6;
     const tw = c.measureText(r.name).width + 8;
     c.fillStyle = "rgba(20,14,30,0.72)";
     c.fillRect(Math.round(x - tw / 2), Math.round(y - small * 0.62), Math.round(tw), Math.round(small * 1.3));
-    c.fillStyle = r.style.gender === "M" ? "#a8d4ff" : "#ffc2dc";
+    c.fillStyle = r.d.npc ? "#ffd84a" : r.style.gender === "M" ? "#a8d4ff" : "#ffc2dc";
     c.fillText(r.name, x, y + 1);
   }
   // 말풍선
   c.font = `${small}px Galmuri11, "Apple SD Gothic Neo", sans-serif`;
   for (const r of list) {
     if (!r.speech) continue;
-    const x = r.x * S, top = (r.y - SH - 4) * S - (r.icon ? 14 * S : 0) - (r.beering ? 18 * S : 0);
+    const x = r.x * S, top = (r.y - SH - 4 - (r.state === "ride" ? r.lift + 2 : 0)) * S - (r.icon ? 14 * S : 0) - (r.beering ? 18 * S : 0);
     const lines = wrap(c, r.speech.text, small * 13), lh = small * 1.35;
     const tw = Math.max(...lines.map((l) => c.measureText(l).width)) + 16, th = lh * lines.length + small * 0.6;
     const bx = Math.round(Math.min(Math.max(x - tw / 2, 4), W * S - tw - 4)), by = Math.round(top - th - 6 * u);
@@ -499,6 +506,49 @@ function drawOverlay() {
 
 // ---------- 참석 명단 ----------
 let people = [];
+// NPC: 산타와 이족보행 루돌프(명단과 무관, 기기마다 혼자 돌아다님)
+const NPCS = [
+  { id: -1, npc: true, name: "산타", style: { gender: "M", skin: "#f6cfae", hair: "buzz", hairColor: "#f4f1ea", top: "santa", topColor: "#d8323a", top2: "#f6f2ea", bottom: "pants", bottomColor: "#d8323a", shoes: "#23232b", hat: "santa", hatColor: "#d8323a", acc: "none", accColor: "#d8323a", sp: "npcsanta" },
+    lines: ["호호호! 메리 크리스마스! 🎅", "올해 착한 일 많이 했나요?", "선물 받을 사람~? 🎁", "호호호호!", "루돌프 어디 갔지?", "다들 한 해 수고 많았어요!", "내년에도 선물 가득! 🎁"] },
+  { id: -2, npc: true, hoppy: true, name: "루돌프", style: { gender: "M", skin: "#a8704a", hair: "buzz", hairColor: "#6a4428", top: "long", topColor: "#8a5a33", top2: "#e9d8b8", bottom: "pants", bottomColor: "#7a4a2a", shoes: "#3a2a20", hat: "antler", hatColor: "#8a5a33", acc: "none", accColor: "#8a5a33", sp: "npcdeer" },
+    lines: ["코가 빛나서 길 안 잃어요 🔴", "썰매 끄느라 다리 아파요…", "두 발로 걷는 거 처음이에요", "산타 할아버지 기다려요!", "음머? 아니 그건 소…", "반짝반짝 ✨", "당근 있어요? 🥕"] },
+];
+NPCS[0].rideLines = ["호호호! 편하구나 🎅", "루돌프야 조금만 천천히!", "이랴~ 🦌", "썰매보다 낫구나!"];
+NPCS[1].rideLines = ["으쌰 으쌰! 🦌", "할아버지 무거워요…", "꽉 잡으세요!", "코 불빛 켭니다 🔴"];
+const [santa, deer] = NPCS.map((d) => { const r = new Resident(d); r.speed = d.hoppy ? 30 : 18; people.push(r); return r; });
+// 둘이 마주치면 루돌프가 산타를 업고 잠시 다닌다
+const ride = { t: 0, cool: rnd(10, 18) };
+function npcRide(dt) {
+  if (ride.t > 0) {
+    ride.t -= dt;
+    santa.x = deer.x; santa.y = deer.y + (deer.dir === 1 ? 0.5 : -0.5);
+    santa.dir = deer.dir; santa.flip = deer.flip;
+    if (deer.state === "idle" && deer.timer > 1.2) deer.timer = 0.6; // 업고 있을 땐 쉬지 않고 돌아다님
+    if (Math.random() < dt * 0.12) (Math.random() < 0.5 ? deer : santa).say(choose((Math.random() < 0.5 ? deer : santa).d.rideLines), 2.2);
+    if (ride.t <= 0) {
+      santa.state = "idle"; santa.lift = 0; santa.mount = null; deer.carrying = false; deer.speed = 30;
+      const side = deer.flip ? 12 : -12;
+      santa.x = blocked(deer.x + side, deer.y) ? deer.x - side : deer.x + side; santa.dir = 0; santa.flip = false;
+      santa.timer = 2.5; santa.hop = 0.6; santa.say("호호호! 잘 탔다 🎅", 2.6);
+      deer.state = "idle"; deer.timer = 2; deer.dir = 0; deer.say("휴… 힘들다 💦", 2.4);
+      ride.cool = rnd(25, 40);
+    }
+    return;
+  }
+  ride.cool -= dt;
+  if (ride.cool > 0 || santa.hidden || deer.hidden || santa.busy || deer.busy) return;
+  // 가끔 루돌프가 산타 쪽으로 간다
+  if (deer.state !== "walk" || Math.random() < dt * 0.3) {
+    if (Math.random() < dt * 0.6 && clearPath(deer.x, deer.y, santa.x, santa.y)) { deer.tx = santa.x + (deer.x < santa.x ? -8 : 8); deer.ty = santa.y; deer.state = "walk"; }
+  }
+  if (Math.hypot(deer.x - santa.x, (deer.y - santa.y) * 1.6) < 16) {
+    ride.t = rnd(7, 10);
+    santa.state = "ride"; santa.lift = 12; santa.mount = deer; santa.speech = null; santa.pending = null;
+    deer.carrying = true; deer.speed = 36; deer.state = "idle"; deer.timer = 1.4; deer.dir = 0; deer.flip = false;
+    deer.say("할아버지 업히세요! 🦌", 2.4); deer.play(exclamation, false);
+    santa.pending = { at: performance.now() / 1000 + 1.2, text: "호호호! 고맙구나 🎅" };
+  }
+}
 const present = new Map(); // id -> { message, at }
 const $ = (q) => document.querySelector(q);
 
@@ -604,6 +654,7 @@ function tick(nowMs) {
   const dt = Math.min(0.05, (nowMs - last) / 1000); last = nowMs;
   const now = nowMs / 1000;
   for (const r of people) r.update(dt, now);
+  npcRide(dt);
   chats();
 
   frame.color.fill(0); frame.light.set(staticLight);
@@ -719,5 +770,5 @@ connectLive({
 renderLists();
 if (params.get("arrive")) setTimeout(() => randomArrivals(+params.get("arrive"), true), 400);
 // 테스트용(서버에 아무것도 보내지 않음): ?debug 로 열면 콘솔에서 광장 캐릭터를 직접 움직일 수 있다
-if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf };
+if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride };
 (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(tick));

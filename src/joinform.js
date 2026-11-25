@@ -389,7 +389,7 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
       g.putImageData(img, 0, 0);
     };
     timer = setInterval(paint, 50); paint();
-    let tab = "basic";
+    let tab = cur().sp && cur().sp !== "none" ? "sp" : "basic";
     const drawParts = () => {
       const st = cur();
       root.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
@@ -405,10 +405,17 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
             : `<button class="sw ${st[k] === v ? "on" : ""}" data-k="${k}" data-v="${v}" style="background:${v}" aria-label="${name} ${v}"></button>`).join("")
         }</div></div>`).join("");
     };
-    root.querySelector(".tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) { tab = b.dataset.tab; drawParts(); } });
+    // 기본 복장 탭을 누르거나 기본 항목을 고르면 특수 복장을 벗는다
+    root.querySelector(".tabs").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-tab]"); if (!b) return;
+      tab = b.dataset.tab;
+      if (tab === "basic" && cur().sp && cur().sp !== "none") { draft = { ...draft, sp: "none" }; out.textContent = ""; }
+      drawParts();
+    });
     parts.addEventListener("click", (e) => {
       const b = e.target.closest("[data-k]"); if (!b) return;
       draft = { ...draft, [b.dataset.k]: b.dataset.v };
+      if (b.dataset.k !== "sp") draft.sp = "none";
       if (b.dataset.k === "top" && !isDress(b.dataset.v) && cur().bottom === "dress") draft.bottom = optionsFor(d.style.gender).bottom[0];
       out.textContent = ""; drawParts();
     });
