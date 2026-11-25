@@ -691,7 +691,7 @@ function tick(nowMs) {
 const ADMIN_KEY_LS = "songnyeonhoe-admin";
 const savedKey = () => { try { return localStorage.getItem(ADMIN_KEY_LS) || ""; } catch { return ""; } };
 const saveKey = (k) => { try { k ? localStorage.setItem(ADMIN_KEY_LS, k) : localStorage.removeItem(ADMIN_KEY_LS); } catch {} };
-const TAPS_NEEDED = 30, TAP_WINDOW = 9000;
+const TAPS_NEEDED = 10, TAP_WINDOW = 5000;
 const tree = { taps: [], shake: 0, boom: -1, bits: [], sparks: [], dust: [] };
 const treeProp = () => props.find((p) => p.spr === bigTree);
 function hitTree(x, y) {
@@ -805,7 +805,7 @@ function drawDust(dt) {
   tree.dust = tree.dust.filter((d) => d.t < d.life);
 }
 function sparkleAt(p, x, y, u, n) {
-  const a = 1 - u, r = 2 + u * 6, c = n >= TAPS_NEEDED - 8 ? C("#ff5a5a") : C("#fff3c0");
+  const a = 1 - u, r = 2 + u * 6, c = n >= TAPS_NEEDED - 3 ? C("#ff5a5a") : C("#fff3c0");
   for (let i = 0; i < 6; i++) { const an = (i / 6) * Math.PI * 2; p.dot(Math.round(x + Math.cos(an) * r), Math.round(y + Math.sin(an) * r), c, a); }
   p.glow(x, y, 6, c, 0.4 * a);
 }
