@@ -50,6 +50,8 @@
   button#cheers { background: var(--red); border-color: #ff7a6a; }
   .hint { color: var(--dim); font-size: 11px; }
   .hint a { color: var(--dim); }
+  #live { color: #c9a0a0; } #live.on { color: #7fe0a0; }
+  [hidden] { display: none !important; }
 
   /* 팝업 */
   #modal { position: fixed; inset: 0; background: #07050cbb; display: none; place-items: center; z-index: 10; padding: 16px; }
@@ -86,7 +88,7 @@
     <button id="cheers">🥂 다 같이 건배</button>
     <button id="reset">↺ 초기화</button>
   </div>
-  <div class="hint">캐릭터를 클릭하면 반응해요 · 다른 탭에서 <a href="join.html" target="_blank">입장 페이지</a>로 들어와도 돼요 · pixel effects by pixelfx (MIT)</div>
+  <div class="hint"><span id="live">○ 연결 중…</span> · 캐릭터를 클릭하면 반응해요 · 휴대폰에서 <a href="join.html" target="_blank">입장 페이지</a>로 들어와도 돼요 · pixel effects by pixelfx (MIT)</div>
   <div id="modal"><div class="sheet"><button id="modalClose" aria-label="닫기">✕</button><div id="modalBody"></div></div></div>
   <script type="module">/*BUNDLE*/</script>
 </body>

@@ -1,2 +1,5 @@
 dist/
 .DS_Store
+.admin-key
+live-worker/node_modules/
+live-worker/.wrangler/

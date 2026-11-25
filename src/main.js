@@ -9,7 +9,7 @@ import { bigTree, drawTreeLights, stage as podium } from "./bigtree.js";
 import { renderSprite, actorFor, SW, SH } from "./characters.js";
 import * as respawnBeam from "../pixelfx/fx/spawn/respawn-beam.js";
 import * as confetti from "../pixelfx/fx/ui/confetti.js";
-import { ALL, MAX, sortedByName, loadAttendees, saveAttendees, onJoin, avatarURL, mountJoinForm } from "./joinform.js";
+import { ALL, MAX, sortedByName, avatarURL, mountJoinForm, connectLive, sendJoin, sendCheers, resetAll } from "./joinform.js";
 
 const W = 640, H = 360;
 const CX = W / 2, FY = 216; // 광장 중심(대형 트리)
@@ -395,10 +395,15 @@ function pixelBox(c, x, y, w, h, u, fill, ink) {
 function wrap(c, text, maxW) {
   if (c.measureText(text).width <= maxW) return [text];
   const out = []; let cur = "";
-  for (const ch of [...text]) {
-    if (c.measureText(cur + ch).width > maxW && cur) { out.push(cur); cur = ch.trimStart(); } else cur += ch;
+  for (const word of text.split(/(?<= )/)) {
+    if (c.measureText(cur + word).width <= maxW) { cur += word; continue; }
+    if (cur) { out.push(cur.trimEnd()); cur = ""; }
+    // 한 단어가 너무 길면 글자 단위로 자른다
+    for (const ch of [...word]) {
+      if (c.measureText(cur + ch).width > maxW && cur) { out.push(cur); cur = ch; } else cur += ch;
+    }
   }
-  if (cur) out.push(cur);
+  if (cur.trim()) out.push(cur.trimEnd());
   return out.slice(0, 3);
 }
 function drawOverlay() {
@@ -469,7 +474,6 @@ function renderLists(highlight) {
 }
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-function persist() { saveAttendees([...present.entries()].map(([id, v]) => ({ id, message: v.message, at: v.at }))); }
 
 /** 입장: 이름·한마디로 광장에 등장 */
 function arrive(id, message, { silent = false, at = Date.now() } = {}) {
@@ -480,7 +484,7 @@ function arrive(id, message, { silent = false, at = Date.now() } = {}) {
     present.get(id).message = message;
     const r = people.find((p) => p.d.id === id);
     if (r) { r.message = message; r.say(message, 6); }
-    persist(); renderLists(id);
+    renderLists(id);
     return;
   }
   present.set(id, { message, at });
@@ -488,7 +492,21 @@ function arrive(id, message, { silent = false, at = Date.now() } = {}) {
   people.push(r);
   if (!silent) { r.enter(); announce(id, message); }
   else r.timer = rnd(0.3, 3);
-  persist(); renderLists(silent ? -1 : id);
+  renderLists(silent ? -1 : id);
+}
+function leave(id) {
+  present.delete(id);
+  people = people.filter((p) => p.d.id !== id);
+}
+/** 서버의 전체 명단에 맞춘다(처음 접속·재연결·초기화). 새로 생긴 사람은 조용히 추가. */
+function applyState(list) {
+  const ids = new Set(list.map((a) => a.id));
+  for (const id of [...present.keys()]) if (!ids.has(id)) leave(id);
+  for (const a of list) {
+    if (present.has(a.id)) { const v = present.get(a.id); v.message = a.message; v.at = a.at; const r = people.find((p) => p.d.id === a.id); if (r) r.message = a.message; }
+    else arrive(a.id, a.message, { silent: true, at: a.at });
+  }
+  renderLists();
 }
 
 // 입장 알림 카드 (차례로)
@@ -506,11 +524,11 @@ function nextAnnounce() {
 }
 
 const SAMPLE_MSG = ["올해 정말 고생 많으셨어요!", "내년에도 잘 부탁드립니다 🙏", "다들 건강하세요!", "올해 최고의 팀이었어요 👏", "새해 복 많이 받으세요", "맛있는 거 먹으러 왔어요 🍗", "내년엔 더 재밌게!", "올 한 해 감사했습니다", "회식 2차 갑니다 🍻", "다들 사랑합니다 ❤️"];
-function randomArrivals(n) {
+function randomArrivals(n, local = false) {
   const waiting = ALL.map((d) => d.id).filter((id) => !present.has(id));
   for (let i = 0; i < n && waiting.length; i++) {
     const id = waiting.splice(Math.floor(Math.random() * waiting.length), 1)[0];
-    setTimeout(() => arrive(id, choose(SAMPLE_MSG)), i * 700);
+    setTimeout(() => (local ? arrive(id, choose(SAMPLE_MSG)) : sendJoin(id, choose(SAMPLE_MSG)).catch(() => {})), i * 700);
   }
 }
 
@@ -560,9 +578,11 @@ ov.addEventListener("pointerdown", (e) => {
   for (const r of people) { const d = Math.hypot(r.x - x, r.y - 12 - y); if (d < 16 && d < bd) { bd = d; best = r; } }
   if (best) best.react();
 });
-document.getElementById("cheers").addEventListener("click", () => {
+function cheersAll() {
   for (const r of people) setTimeout(() => { r.say(choose(["건배! 🥂", "위하여~!", "건배~!!", "올해도 수고했어요!"])); r.pop("cheers"); }, Math.random() * 600);
-});
+}
+let online = false;
+document.getElementById("cheers").addEventListener("click", () => { if (online) sendCheers().catch(cheersAll); else cheersAll(); });
 
 // 입장 팝업
 let form = null;
@@ -573,27 +593,31 @@ $("#joinBtn").addEventListener("click", openModal);
 modal.addEventListener("pointerdown", (e) => { if (e.target === modal) closeModal(); });
 $("#modalClose").addEventListener("click", closeModal);
 addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+// 관리자 버튼은 ?admin 으로 열었을 때만
+const isAdmin = params.has("admin");
+for (const b of ["#rand5", "#reset"]) $(b).hidden = !isAdmin;
 $("#rand5").addEventListener("click", () => randomArrivals(5));
-$("#reset").addEventListener("click", () => {
-  if (!confirm("참석 명단을 모두 비울까요?")) return;
-  present.clear(); people = []; persist(); renderLists();
+$("#reset").addEventListener("click", async () => {
+  const key = prompt("모든 기기의 참석 명단을 비웁니다. 관리자 코드를 입력하세요.");
+  if (!key) return;
+  try { await resetAll(key.trim()); } catch (e) { alert(e.message === "forbidden" ? "관리자 코드가 맞지 않아요." : "초기화에 실패했어요."); }
 });
-// 다른 탭(모바일 입장 페이지)에서 온 입장
-onJoin((id, message) => arrive(id, message));
 
 buildBackground();
 buildProps();
 form = mountJoinForm($("#modalBody"), {
   waiting: () => ALL.map((d) => d.id).filter((id) => !present.has(id)),
-  onSubmit: (id, message) => { arrive(id, message); setTimeout(closeModal, 500); },
+  onSubmit: (id, message) => sendJoin(id, message).then(() => setTimeout(closeModal, 600)),
   doneText: "입장! 광장을 보세요 🎉",
 });
-for (const a of loadAttendees()) arrive(a.id, a.message, { silent: true, at: a.at || Date.now() });
-// 테스트용: ?n=30 → 랜덤 30명 바로 입장
-if (params.get("n")) {
-  const waiting = ALL.map((d) => d.id).filter((id) => !present.has(id));
-  for (let i = 0; i < Math.min(+params.get("n"), waiting.length); i++) arrive(waiting.splice(Math.floor(Math.random() * waiting.length), 1)[0], choose(SAMPLE_MSG), { silent: true });
-}
+// 실시간 연결: 명단 동기화 + 입장/건배 신호 (위치는 화면마다 랜덤)
+connectLive({
+  state: applyState,
+  join: (e) => arrive(e.id, e.message, { at: e.at }),
+  update: (e) => arrive(e.id, e.message),
+  cheers: cheersAll,
+  status: (on) => { online = on; const el = $("#live"); el.textContent = on ? "● 실시간 연결됨" : "○ 연결 중…"; el.className = on ? "on" : ""; },
+});
 renderLists();
-if (params.get("arrive")) setTimeout(() => randomArrivals(+params.get("arrive")), 400);
+if (params.get("arrive")) setTimeout(() => randomArrivals(+params.get("arrive"), true), 400);
 (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(tick));

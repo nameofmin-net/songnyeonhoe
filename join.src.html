@@ -12,13 +12,14 @@
   body { display: flex; flex-direction: column; align-items: center; padding: 28px 16px 40px; gap: 18px; }
   .brand { font-size: 13px; color: #ffd84a; letter-spacing: 0.04em; }
   #join { width: min(420px, 100%); background: var(--panel); border: 3px solid var(--line); box-shadow: 0 0 0 3px #1c1624; padding: 20px; }
+  #live { color: #c9a0a0; } #live.on { color: #7fe0a0; }
   .foot { font-size: 11px; color: #7a7090; text-align: center; line-height: 1.6; max-width: 420px; }
 </style>
 </head>
 <body>
   <div class="brand">🎄 2026 U PLEAT 송년회</div>
   <div id="join"></div>
-  <div class="foot">입장하면 메인 화면 광장에 내 캐릭터가 등장해요.<br>(테스트 버전: 메인 화면과 같은 브라우저에서 열어 주세요)</div>
+  <div class="foot"><span id="live">○ 광장에 연결 중…</span><br>입장하면 메인 화면 광장에 내 캐릭터가 등장해요.</div>
   <script type="module">/*BUNDLE*/</script>
 </body>
 </html>
