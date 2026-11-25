@@ -12,6 +12,45 @@
   body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 8px 12px; overflow: hidden; }
   .row { display: flex; gap: 12px; align-items: stretch; justify-content: center; max-width: 100%; }
   #stage { position: relative; flex: none; box-shadow: 0 0 0 3px #1c1624, 0 0 0 6px var(--line), 0 20px 60px #000a; }
+  /* 시상식 무대: 빨간 커튼 */
+  #stage { container-type: size; }
+  #show { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+  #show .cur { position: absolute; top: 0; bottom: 0; width: 51%; transition: transform 1.05s cubic-bezier(.65,0,.35,1);
+    background: linear-gradient(180deg, #0000 0 88%, #0006 100%), repeating-linear-gradient(90deg, #6a0a12 0 1.2%, #a8141f 1.2% 3.4%, #d8323a 3.4% 4.6%, #b81d2a 4.6% 6.4%, #7a0d16 6.4% 7.6%); }
+  #show .cur.l { left: 0; transform: translateX(-112%); box-shadow: inset -1.2cqw 0 1.5cqw #0008; }
+  #show .cur.r { right: 0; transform: translateX(112%); box-shadow: inset 1.2cqw 0 1.5cqw #0008; }
+  #show .cur::after { content: ""; position: absolute; top: 0; bottom: 0; width: 1cqw; background: repeating-linear-gradient(180deg, #ffd84a 0 3%, #c8941a 3% 5%); }
+  #show .cur.l::after { right: 0; } #show .cur.r::after { left: 0; }
+  #show.closed .cur { transform: none; }
+  #show .valance { position: absolute; left: 0; right: 0; top: 0; height: 9cqh; transform: translateY(-105%); transition: transform .7s cubic-bezier(.25,1,.5,1);
+    background: radial-gradient(circle at 50% 0, #d8323a 62%, #0000 64%) 0 0 / 8cqw 9cqh repeat-x; border-top: .8cqh solid #ffd84a; filter: drop-shadow(0 .6cqh 0 #c8941a) drop-shadow(0 1cqh .8cqh #0008); }
+  #show.on .valance, #show.closed .valance { transform: none; }
+  #show .sh-back { position: absolute; inset: 0; opacity: 0; transition: opacity .3s;
+    background: radial-gradient(ellipse 30% 70% at 30% 0, #fff3c022, #0000 70%), radial-gradient(ellipse 30% 70% at 70% 0, #fff3c022, #0000 70%), radial-gradient(ellipse 60% 50% at 50% 55%, #3a1a3a, #120a18 80%); }
+  #show.on .sh-back { opacity: 1; }
+  #show .sh-card { position: absolute; inset: 9cqh 4cqw 3cqh; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 2.4cqh; text-align: center; color: #f4eefc; }
+  #show.on .sh-card { display: flex; }
+  #show .sh-t { font-size: 7.2cqw; font-weight: bold; color: #ffd84a; text-shadow: 0 .5cqw 0 #8a3a10, 0 0 3cqw #ffb84a88; letter-spacing: .05em; transition: font-size .6s cubic-bezier(.25,1,.5,1); word-break: keep-all; line-height: 1.25; }
+  #show .sh-t small { display: block; font-size: 2.1cqw; color: #ffc2dc; letter-spacing: .3em; margin-bottom: 1.2cqh; text-shadow: none; font-weight: normal; }
+  #show .sh-s { font-size: 3.6cqw; color: #fff; padding: .8cqh 3cqw; border: .35cqw solid #ffd84a; background: #1c1624cc; display: none; }
+  #show .ppl { display: none; flex-wrap: wrap; justify-content: center; gap: 1.6cqh 2.2cqw; max-width: 92cqw; }
+  #show .pp { display: flex; flex-direction: column; align-items: center; gap: .6cqh; opacity: 0; transform: translateY(2cqh) scale(.6); }
+  #show .pp img { height: var(--ph, 15cqh); image-rendering: pixelated; filter: drop-shadow(0 0 1.2cqw #ffd84a66); }
+  #show .pp b { font-size: var(--pf, 2.2cqw); font-weight: normal; background: #1c1624dd; padding: .2cqh .8cqw; }
+  #show .pp b small { color: #9a90b0; margin-left: .4cqw; font-size: .8em; }
+  #show.s1 .sh-t, #show.s2 .sh-t { font-size: 4.6cqw; }
+  #show.s1 .sh-s, #show.s2 .sh-s { display: block; animation: shIn .6s cubic-bezier(.25,1,.5,1) both; }
+  #show.s1 .ppl, #show.s2 .ppl { display: flex; }
+  #show.s1 .pp, #show.s2 .pp { animation: ppIn .5s cubic-bezier(.34,1.4,.64,1) forwards; }
+  #show.s2 .pp img { animation: ppHop .5s ease-in-out infinite alternate; }
+  #show .sh-congrats { display: none; font-size: 3.4cqw; color: #ff8ad8; }
+  #show.s2 .sh-congrats { display: block; animation: shIn .5s cubic-bezier(.25,1,.5,1) both; }
+  #show .sh-conf { position: absolute; inset: 0; }
+  #show .sh-conf i { position: absolute; top: -4%; width: 1.1cqw; height: 1.8cqh; animation: fall linear forwards; }
+  @keyframes shIn { from { opacity: 0; transform: translateY(2cqh); } to { opacity: 1; transform: none; } }
+  @keyframes ppIn { to { opacity: 1; transform: none; } }
+  @keyframes ppHop { to { transform: translateY(-1.2cqh); } }
+  @keyframes fall { to { transform: translateY(110cqh) rotate(720deg); } }
   #stage.boom { animation: boom .7s cubic-bezier(.25,1,.5,1); }
   @keyframes boom { 0%,100% { transform: none; } 10% { transform: translate(-8px, 4px); } 25% { transform: translate(7px, -5px); } 40% { transform: translate(-5px, 3px); } 60% { transform: translate(3px, -2px); } 80% { transform: translate(-1px, 1px); } }
   #stage canvas { position: absolute; inset: 0; image-rendering: pixelated; image-rendering: crisp-edges; }
@@ -102,6 +141,7 @@
     <div id="stage">
       <canvas id="world"></canvas><canvas id="overlay"></canvas>
       <div id="announce"></div>
+      <div id="show"><div class="sh-back"></div><div class="sh-card"></div><div class="sh-conf"></div><div class="cur l"></div><div class="cur r"></div><div class="valance"></div></div>
     </div>
     <div class="col right">
       <section class="panel chat">

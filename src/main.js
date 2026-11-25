@@ -878,6 +878,52 @@ function onChat(m) {
   if (r && !r.hidden) r.say(m.text, 3 + m.text.length * 0.12);
 }
 
+// ---------- 시상식: 빨간 커튼 무대 (어드민 컨트롤러가 재생) ----------
+const showEl = $("#show"), showCard = showEl.querySelector(".sh-card");
+let showCur = null, showChain = Promise.resolve();
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+function fillShow(sh) {
+  const n = sh.people.length, ph = n <= 6 ? 22 : n <= 12 ? 17 : n <= 24 ? 12 : 8, pf = n <= 6 ? 2.3 : n <= 12 ? 1.9 : n <= 24 ? 1.6 : 1.35;
+  showCard.style.setProperty("--ph", ph + "cqh"); showCard.style.setProperty("--pf", pf + "cqw");
+  showCard.innerHTML = `<div class="sh-t"><small>2026 U PLEAT AWARDS</small>${esc(sh.title)}</div>
+    ${sh.sub ? `<div class="sh-s">${esc(sh.sub)}</div>` : ""}
+    <div class="ppl">${sh.people.filter((id) => ALL[id]).map((id, i) => `<div class="pp" style="animation-delay:${(0.25 + i * Math.min(0.12, 1.6 / Math.max(1, n))).toFixed(2)}s"><img src="${avatarURL(id, 3)}" alt=""><b>${esc(ALL[id].name)}${ALL[id].rank ? `<small>${ALL[id].rank}</small>` : ""}</b></div>`).join("")}</div>
+    <div class="sh-congrats">🎉 축하합니다! 🎉</div>`;
+}
+function stepClass(step) { showEl.classList.remove("s0", "s1", "s2"); showEl.classList.add("s" + step); }
+function confettiRain() {
+  const box = showEl.querySelector(".sh-conf"), cols = ["#ffd84a", "#ff5a5a", "#5ae08a", "#5ab4ff", "#ff8ad8", "#ffffff"];
+  box.innerHTML = Array.from({ length: 90 }, () => `<i style="left:${Math.random() * 100}%;background:${choose(cols)};animation-duration:${(2.2 + Math.random() * 2).toFixed(2)}s;animation-delay:${(Math.random() * 1.2).toFixed(2)}s"></i>`).join("");
+  setTimeout(() => (box.innerHTML = ""), 5000);
+}
+async function doShow(sh) {
+  const isNew = sh && (!showCur || showCur.sid !== sh.sid);
+  if (!sh) {
+    if (!showCur) return;
+    showCur = null;
+    sfx.curtain(); showEl.classList.add("closed"); await wait(1100);
+    showEl.classList.remove("on", "s0", "s1", "s2"); showCard.innerHTML = "";
+    await wait(250); sfx.curtain(); showEl.classList.remove("closed");
+    return;
+  }
+  if (isNew) {
+    showCur = { ...sh, step: 0 };
+    sfx.curtain(); showEl.classList.add("closed"); await wait(1100);
+    fillShow(sh); stepClass(0); showEl.classList.add("on");
+    sfx.drumroll(1.1); await wait(1200);
+    sfx.curtain(); showEl.classList.remove("closed"); await wait(500); sfx.fanfare();
+    if (sh.step > 0) { await wait(900); }
+    else return;
+  }
+  const prev = showCur.step ?? 0;
+  showCur = sh;
+  if (sh.step === prev && !isNew) return;
+  stepClass(sh.step);
+  if (sh.step === 1 && prev < 1) { sfx.drumroll(0.7); setTimeout(() => sfx.applause(2.6), 700); }
+  if (sh.step === 2) { sfx.fanfare(); sfx.applause(3); confettiRain(); for (const id of sh.people) people.find((p) => p.d.id === id)?.emote("party"); }
+}
+function applyShow(sh) { showChain = showChain.then(() => doShow(sh)).catch(() => {}); }
+
 // ---------- 명단 자동 스크롤 ----------
 function autoScroll(el) {
   let dir = 1, hold = 2.5, hover = false, acc = 0;
@@ -913,10 +959,11 @@ connectLive({
   chatlog: (items) => { chatItems = items.slice(-150); renderChat(); },
   chat: onChat,
   emote: onEmote,
+  show: applyShow,
   status: (on) => { online = on; const el = $("#live"); el.textContent = on ? "● 실시간 연결됨" : "○ 연결 중…"; el.className = on ? "on" : ""; },
 });
 renderLists();
 if (params.get("arrive")) setTimeout(() => randomArrivals(+params.get("arrive"), true), 400);
 // 테스트용(서버에 아무것도 보내지 않음): ?debug 로 열면 콘솔에서 광장 캐릭터를 직접 움직일 수 있다
-if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride, explode: () => explodeTree(), leaveAll: () => { for (const id of [...present.keys()]) leave(id); } };
+if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride, explode: () => explodeTree(), leaveAll: () => { for (const id of [...present.keys()]) leave(id); }, show: (sh) => applyShow(sh) };
 (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(tick));

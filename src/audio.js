@@ -106,6 +106,26 @@ export const sfx = {
     noise(sfxBus, { dur: 1.8, vol: 0.12, type: "highpass", f: 7000 });
     ["C6", "E6", "G6", "C7"].forEach((n) => bell(hz(midi(n)), 1.85, 0.22, 1.4));
   },
+  /** 커튼 쓸리는 소리 */
+  curtain() { if (ok("curtain", 400)) { noise(sfxBus, { dur: 1.0, vol: 0.35, f: 500, f2: 1800, q: 0.7 }); noise(sfxBus, { t: 0.1, dur: 0.9, vol: 0.15, type: "lowpass", f: 400 }); } },
+  /** 두구두구 */
+  drumroll(dur = 1.2) {
+    if (!ok("drum", 300)) return;
+    for (let t = 0; t < dur; t += 0.045) { const v = 0.12 + 0.25 * (t / dur); noise(sfxBus, { t, dur: 0.06, vol: v, type: "bandpass", f: 220, q: 1.5 }); tone(sfxBus, { f: 110, f2: 80, t, dur: 0.05, vol: v * 0.6 }); }
+    noise(sfxBus, { t: dur, dur: 0.6, vol: 0.5, type: "highpass", f: 4000 }); // 심벌
+  },
+  /** 빰빠밤~ 팡파르 */
+  fanfare() {
+    if (!ok("fanfare", 800)) return;
+    const seq = [["G4", 0, 0.12], ["G4", 0.14, 0.12], ["G4", 0.28, 0.12], ["C5", 0.42, 0.5], ["E5", 0.95, 0.16], ["G5", 1.13, 0.7]];
+    for (const [n, t, d] of seq) { const f = hz(midi(n)); tone(sfxBus, { f, t, dur: d + 0.1, type: "sawtooth", vol: 0.16, cut: 2600 }); tone(sfxBus, { f: f * 1.5, t, dur: d + 0.1, type: "square", vol: 0.06, cut: 2400 }); tone(sfxBus, { f: f / 2, t, dur: d + 0.1, type: "triangle", vol: 0.25 }); }
+    noise(sfxBus, { t: 1.13, dur: 0.8, vol: 0.35, type: "highpass", f: 5000 });
+  },
+  /** 박수 짝짝짝 */
+  applause(dur = 2.5) {
+    if (!ok("applause", 800)) return;
+    for (let i = 0; i < dur * 40; i++) { const t = Math.random() * dur, fade = 1 - t / dur; noise(sfxBus, { t, dur: 0.03, vol: (0.08 + Math.random() * 0.12) * fade, type: "bandpass", f: 1200 + Math.random() * 1800, q: 1.2 }); }
+  },
   /** 루돌프가 산타를 업음: 방울 딸랑 */
   jingle() { if (ok("jingle", 500)) for (let i = 0; i < 6; i++) noise(sfxBus, { t: i * 0.09, dur: 0.12, vol: 0.25, f: 6500, q: 8 }); },
 };

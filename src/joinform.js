@@ -39,6 +39,12 @@ export const EMOTES = [
 ];
 export const emoteOf = (k) => EMOTES.find((e) => e[0] === k);
 export const resetAll = (key) => post("/api/reset", {}, { "X-Admin-Key": key });
+// 어드민(컨트롤러)
+export const ADMIN_NAME = "최민우";
+export const ADMIN_ID = ALL.findIndex((d) => d.name === ADMIN_NAME);
+const ADMIN_LS = "songnyeonhoe-admin";
+export const adminKey = { get: () => { try { return localStorage.getItem(ADMIN_LS) || ""; } catch { return ""; } }, set: (k) => { try { k ? localStorage.setItem(ADMIN_LS, k) : localStorage.removeItem(ADMIN_LS); } catch {} } };
+export const adminPost = (path, body) => post(path, body, { "X-Admin-Key": adminKey.get() });
 
 /**
  * 서버와 WebSocket으로 연결해 신호를 받는다. 끊기면 자동 재연결.
@@ -59,6 +65,7 @@ export function connectLive(h) {
       else if (m.type === "chatlog") h.chatlog?.(m.items || []);
       else if (m.type === "chat") h.chat?.(m);
       else if (m.type === "emote") h.emote?.(m);
+      else if (m.type === "show") h.show?.(m.show);
     };
     ws.onclose = () => { clearInterval(ping); h.status?.(false); setTimeout(open, wait); wait = Math.min(wait * 2, 15000); };
     ws.onerror = () => { try { ws.close(); } catch {} };
@@ -171,6 +178,7 @@ const CSS = `
 .mob-head .who b { font-size: 17px; display: block; } .mob-head .who b.M { color: #a8d4ff; } .mob-head .who b.F { color: #ffc2dc; }
 .mob-head .who small { font-size: 11px; color: #9a90b0; }
 .mob-head .btn { padding: 8px 12px; font-size: 13px; }
+.mob-head .btn.ctl-btn { padding: 6px 10px; font-size: 20px; }
 .mob-chat { flex: 1; overflow-y: auto; padding: 8px 10px; list-style: none; margin: 0; }
 .mob-chat .empty { color: #7a7090; text-align: center; padding: 40px 10px; font-size: 13px; line-height: 1.6; }
 .mob-emo { display: flex; gap: 6px; overflow-x: auto; padding: 8px 10px 0; background: #1a1426; border-top: 2px solid #3a2f52; flex: none; scrollbar-width: none; }
@@ -223,7 +231,7 @@ const PW = 40, PH = 46;
  * entries(): 서버 명단 Map(id -> {message, style})
  * 반환: { sync() — 명단이 바뀌면 호출, focus() }
  */
-export function mountEntry(root, { lock = true, entries, onEntered }) {
+export function mountEntry(root, { lock = true, entries, onEntered, onController }) {
   if (!cssOn) { const s = document.createElement("style"); s.textContent = CSS; document.head.append(s); cssOn = true; }
   let view = null, me = null, timer = null, chatItems = [], renderChat = null;
 
@@ -323,6 +331,7 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
           <header class="mob-head">
             <img class="mob-av" src="${avatarURL(id, 2)}" alt="">
             <div class="who"><b class="${d.style.gender}">${esc(d.name)} 님</b><small class="mob-live">${sub}</small></div>
+            ${id === ADMIN_ID && onController ? `<button class="btn ctl-btn" data-act="ctl">🎮</button>` : ""}
             <button class="btn sub" data-act="edit">캐릭터 수정</button>
           </header>
           <ul class="mob-chat"></ul>
@@ -360,6 +369,7 @@ export function mountEntry(root, { lock = true, entries, onEntered }) {
       });
       root.querySelector(".mob").addEventListener("click", (e) => {
         const act = e.target.closest("[data-act]")?.dataset.act;
+        if (act === "ctl") { onController(); return; }
         if (act === "edit") { sheet.hidden = false; sheet.scrollTop = 0; }
         if (act === "close") { sheet.hidden = true; root.querySelector(".mob-av").src = avatarURL(id, 2); }
       });

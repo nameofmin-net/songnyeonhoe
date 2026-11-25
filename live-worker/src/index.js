@@ -48,7 +48,13 @@ export class Room extends DurableObject {
     const cols = ctx.storage.sql.exec("PRAGMA table_info(att)").toArray().map((c) => c.name);
     if (!cols.includes("style")) ctx.storage.sql.exec("ALTER TABLE att ADD COLUMN style TEXT NOT NULL DEFAULT '{}'");
     ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS chat (cid INTEGER PRIMARY KEY AUTOINCREMENT, who INTEGER NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL)");
+    ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS menus (sid INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, title TEXT NOT NULL, sub TEXT NOT NULL, people TEXT NOT NULL, at INTEGER NOT NULL)");
     this.lastChat = new Map();
+    this.show = null;
+    ctx.blockConcurrencyWhile(async () => { this.show = (await ctx.storage.get("show")) || null; });
+  }
+  menus() {
+    return this.ctx.storage.sql.exec("SELECT sid, name, title, sub, people, at FROM menus ORDER BY sid").toArray().map((m) => ({ ...m, people: JSON.parse(m.people || "[]") }));
   }
   list() {
     return this.ctx.storage.sql.exec("SELECT id, message, at, style FROM att ORDER BY at").toArray().map(row);
@@ -71,6 +77,7 @@ export class Room extends DurableObject {
       this.ctx.acceptWebSocket(server);
       server.send(JSON.stringify({ type: "state", attendees: this.list() }));
       server.send(JSON.stringify({ type: "chatlog", items: this.chatlog() }));
+      server.send(JSON.stringify({ type: "show", show: this.show }));
       return new Response(null, { status: 101, webSocket: client });
     }
     if (path === "/api/state" && req.method === "GET") return json(req, { attendees: this.list() });
@@ -135,6 +142,38 @@ export class Room extends DurableObject {
       this.lastCheers = now;
       this.broadcast({ type: "cheers" });
       return json(req, { ok: true });
+    }
+    // ---------- 어드민 컨트롤러: 시상 메뉴 만들기 · 재생 ----------
+    if (path.startsWith("/api/menu") || path === "/api/show") {
+      if (!this.admin(req)) return json(req, { error: "forbidden" }, 403);
+      const txt = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
+      if (path === "/api/menus") return json(req, { ok: true, menus: this.menus(), show: this.show });
+      if (path === "/api/menu/save") {
+        const name = txt(body.name, 30), title = txt(body.title, 40), sub = txt(body.sub, 60);
+        const people = [...new Set((Array.isArray(body.people) ? body.people : []).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < MAX))].slice(0, 60);
+        if (!name || !title) return json(req, { error: "name and title required" }, 400);
+        const sid = Number(body.sid);
+        if (sid > 0) this.ctx.storage.sql.exec("UPDATE menus SET name = ?, title = ?, sub = ?, people = ? WHERE sid = ?", name, title, sub, JSON.stringify(people), sid);
+        else this.ctx.storage.sql.exec("INSERT INTO menus (name, title, sub, people, at) VALUES (?, ?, ?, ?, ?)", name, title, sub, JSON.stringify(people), Date.now());
+        return json(req, { ok: true, menus: this.menus() });
+      }
+      if (path === "/api/menu/delete") {
+        this.ctx.storage.sql.exec("DELETE FROM menus WHERE sid = ?", Number(body.sid));
+        return json(req, { ok: true, menus: this.menus() });
+      }
+      if (path === "/api/show") {
+        const step = Number(body.step);
+        if (step < 0 || !body.sid) { this.show = null; }
+        else {
+          const m = this.menus().find((x) => x.sid === Number(body.sid));
+          if (!m) return json(req, { error: "no menu" }, 404);
+          this.show = { sid: m.sid, title: m.title, sub: m.sub, people: m.people, step: Math.min(2, Math.max(0, step)), at: Date.now() };
+        }
+        await this.ctx.storage.put("show", this.show);
+        this.broadcast({ type: "show", show: this.show });
+        return json(req, { ok: true, show: this.show });
+      }
+      return json(req, { error: "not found" }, 404);
     }
     if (path === "/api/chatclear") {
       if (!this.admin(req)) return json(req, { error: "forbidden" }, 403);
