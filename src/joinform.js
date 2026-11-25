@@ -149,9 +149,14 @@ const CSS = `
 .mob-in input { flex: 1; min-width: 0; font: inherit; font-size: 16px; color: #f4eefc; background: #15101f; border: 2px solid #4a3f6a; padding: 10px 12px; border-radius: 0; }
 .mob-in input:focus { outline: none; border-color: #ffd84a; }
 .mob-in .btn { padding: 10px 16px; font-size: 15px; }
-.mob-sheet { position: fixed; inset: 0; background: #110d18; overflow-y: auto; padding: 16px; z-index: 5; }
+.mob-sheet { position: fixed; inset: 0; background: #110d18; overflow-y: auto; padding: 0 16px 24px; z-index: 5; }
 .mob-sheet[hidden] { display: none; }
-.mob-sheet .close { position: sticky; top: 0; float: right; z-index: 2; }
+.mob-sheet .close { position: fixed; top: 12px; right: 12px; z-index: 3; padding: 6px 10px; font-size: 13px; }
+/* 스크롤해도 내 캐릭터 미리보기는 위에 고정 */
+.mob-sheet .me-stage { position: sticky; top: 0; z-index: 2; background: #110d18; margin: 0 -16px; padding: 14px 16px 12px; border-bottom: 2px solid #2e2546; box-shadow: 0 8px 16px #110d18; }
+.mob-sheet .me-stage .me-pv { width: 84px; height: 120px; }
+.mob-sheet .me-stage .me-pv canvas { width: 72px; height: 112px; }
+.mob-sheet .me-stage > div:last-child { padding-right: 64px; }
 `;
 let cssOn = false;
 const ME_KEY = "songnyeonhoe-me-v1";
