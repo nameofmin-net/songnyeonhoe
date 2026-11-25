@@ -2,7 +2,7 @@
 // 캐릭터 위치는 주고받지 않는다(각 화면이 랜덤으로 움직임).
 import { DurableObject } from "cloudflare:workers";
 
-const MAX = 110, MSG = 40;
+const MAX = 104, MSG = 40;
 const ORIGINS = ["https://nameofmin-net.github.io", "http://localhost:8931"];
 
 function cors(req) {

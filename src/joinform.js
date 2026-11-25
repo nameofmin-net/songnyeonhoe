@@ -1,8 +1,9 @@
 // 입장(메인 팝업 · 모바일 입장 페이지 공용): 이름+한마디 입장 → 내 캐릭터(복장·한마디 수정)
 import { makePopulation, renderSprite, applyStyle, optionsFor, LABELS, SW, SH } from "./characters.js";
 
-export const MAX = 110;
-export const ALL = makePopulation(MAX);
+import { ROSTER } from "./roster.js";
+export const ALL = makePopulation(0, 2026, ROSTER);
+export const MAX = ALL.length;
 export const byId = (id) => ALL[id];
 export const sortedByName = (ids) => [...ids].sort((a, b) => ALL[a].name.localeCompare(ALL[b].name, "ko"));
 

@@ -38,19 +38,25 @@ const GIVEN_M = ["민준", "서준", "도윤", "예준", "시우", "하준", "�
 const GIVEN_F = ["서연", "서윤", "지우", "서현", "민서", "하은", "하윤", "윤서", "지유", "지민", "채원", "수아", "지아", "다은", "예은", "은서", "소율", "예린", "수빈", "지원", "유나", "하린", "시아", "가은", "나연", "예나", "소연", "혜원", "다인", "유진", "세아", "아린", "채은", "보람", "미소", "은지", "현아", "나래", "수진", "가영"];
 
 /** n명의 고유한 주민을 만든다. 짝수번째 남, 홀수번째 여 → 앞에서 몇 명을 잘라도 5:5. */
-export function makePopulation(n, seed = 2026) {
+// 실제 명단에는 자연스러운 머리색·피부톤을 기본으로(본인이 입장 후 바꿀 수 있음)
+const NATURAL_HAIR = ["#231c26", "#231c26", "#3b2a22", "#3b2a22", "#5e3a24", "#8a5a33"];
+const NATURAL_SKIN = ["#ffe3cc", "#f6cfae", "#f6cfae", "#eab58e"];
+/** roster가 있으면 그 이름·성별로, 없으면 n명을 무작위로 만든다. */
+export function makePopulation(n, seed = 2026, roster = null) {
   const r = mulberry(seed), names = new Set(), looks = new Set(), out = [];
+  if (roster) n = roster.length;
   for (let i = 0; i < n; i++) {
-    const gender = i % 2 === 0 ? "M" : "F";
+    const gender = roster ? roster[i].gender : i % 2 === 0 ? "M" : "F";
     let name;
-    do name = pick(r, SUR) + pick(r, gender === "M" ? GIVEN_M : GIVEN_F); while (names.has(name));
+    if (roster) name = roster[i].name;
+    else do name = pick(r, SUR) + pick(r, gender === "M" ? GIVEN_M : GIVEN_F); while (names.has(name));
     names.add(name);
     let st, key;
     do {
       st = {
         gender,
-        skin: pick(r, SKINS),
-        hairColor: pick(r, HAIR_COLORS),
+        skin: pick(r, roster ? NATURAL_SKIN : SKINS),
+        hairColor: pick(r, roster && r() < 0.85 ? NATURAL_HAIR : HAIR_COLORS),
         hair: pick(r, gender === "M" ? HAIR_M : HAIR_F),
         top: pick(r, gender === "M" ? TOP_M : TOP_F),
         topColor: pick(r, CLOTH),
