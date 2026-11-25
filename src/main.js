@@ -10,6 +10,7 @@ import { renderSprite, actorFor, SW, SH } from "./characters.js";
 import * as respawnBeam from "../pixelfx/fx/spawn/respawn-beam.js";
 import * as confetti from "../pixelfx/fx/ui/confetti.js";
 import * as beer from "./beer.js";
+import * as transform from "./transform.js";
 import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf, chatItemHTML } from "./joinform.js";
 
 const W = 640, H = 360;
@@ -268,6 +269,7 @@ class Resident {
   update(dt, now) {
     this.t += dt; this.chatCool -= dt;
     if (this.hop > 0) this.hop -= dt;
+    if (this.swap && this.t >= this.swap.at) { this.setStyle(this.swap.st); this.swap = null; }
     if (this.dance > 0) { this.dance -= dt; this.dir = [0, 2, 1, 2][Math.floor(this.t * 5) % 4]; this.flip = Math.floor(this.t * 5) % 4 === 3; if (this.dance <= 0) { this.dir = 0; this.flip = false; } }
     for (const f of this.fx) {
       f.age += dt; f.fx.update(dt);
@@ -329,6 +331,14 @@ class Resident {
     else if (kind === "laugh") { this.say("ㅋㅋㅋㅋㅋ", 2.2); this.pop("sweat"); this.hop = 0.9; hold(1.6); }
     else if (kind === "wow") { this.play(exclamation, false); hold(1.4); }
     else if (kind === "sleepy") { this.play(sleep, true, 3.2); hold(3.2); }
+  }
+  /** 복장 변경: 변신 이펙트를 틀고, 섬광이 가장 밝을 때 새 옷으로 바꾼다 */
+  transformTo(st) {
+    if (this.hidden) { this.setStyle(st); return; }
+    this.state = "idle"; this.dir = 0; this.flip = false; this.dance = 0;
+    this.timer = Math.max(this.timer, transform.meta.duration);
+    this.play(transform, false);
+    this.swap = { st, at: this.t + transform.SWAP };
   }
   get beering() { return this.fx.some((f) => f.fx.meta === beer.meta); }
   get hidden() {
@@ -516,7 +526,7 @@ function arrive(id, message, { silent = false, at = Date.now() } = {}) {
     if (r) {
       r.message = message;
       const st = styleOf(id);
-      if (JSON.stringify(st) !== JSON.stringify(r.style)) { r.setStyle(st); r.pop("star"); r.play(exclamation, false); }
+      if (JSON.stringify(st) !== JSON.stringify(r.swap ? r.swap.st : r.style)) r.transformTo(st);
       if (changed) r.say(message, 6);
     }
     renderLists(id);
@@ -702,4 +712,6 @@ connectLive({
 });
 renderLists();
 if (params.get("arrive")) setTimeout(() => randomArrivals(+params.get("arrive"), true), 400);
+// 테스트용(서버에 아무것도 보내지 않음): ?debug 로 열면 콘솔에서 광장 캐릭터를 직접 움직일 수 있다
+if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf };
 (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(tick));
