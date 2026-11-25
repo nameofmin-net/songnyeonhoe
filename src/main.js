@@ -664,9 +664,16 @@ function tick(nowMs) {
   items.sort((a, b) => a.y - b.y);
   for (const it of items) {
     if (it.r) it.r.draw();
-    else if (it.p) { blitProp(it.p); if (it.p.spr === bigTree) drawTreeLights(painterFor(frame), it.p.x, it.p.y, now); }
+    else if (it.p) {
+      if (it.p.spr === bigTree) {
+        if (!treeVisible()) continue;
+        const sx = tree.shake > 0 ? Math.round(Math.sin(tree.shake * 60)) : 0, pp = sx ? { ...it.p, x: it.p.x + sx } : it.p;
+        blitProp(pp); drawTreeLights(painterFor(frame), pp.x, pp.y, now);
+      } else blitProp(it.p);
+    }
   }
   for (const it of items) if (it.r) it.r.drawFront();
+  drawTreeFx(dt);
   drawSnow(dt, now);
   composite(frame, img.data, bg);
   ctx.putImageData(img, 0, 0);
@@ -674,9 +681,95 @@ function tick(nowMs) {
   requestAnimationFrame(tick);
 }
 
+// ---------- 이스터에그: 트리를 빠르게 30번 누르면 트리가 터지며 초기화 ----------
+const ADMIN_KEY_LS = "songnyeonhoe-admin";
+const savedKey = () => { try { return localStorage.getItem(ADMIN_KEY_LS) || ""; } catch { return ""; } };
+const saveKey = (k) => { try { k ? localStorage.setItem(ADMIN_KEY_LS, k) : localStorage.removeItem(ADMIN_KEY_LS); } catch {} };
+const TAPS_NEEDED = 30, TAP_WINDOW = 9000;
+const tree = { taps: [], shake: 0, boom: -1, bits: [], sparks: [] };
+const treeProp = () => props.find((p) => p.spr === bigTree);
+function hitTree(x, y) {
+  const p = treeProp(); if (!p) return false;
+  const s = p.spr, lx = Math.floor(x - (p.x - s.ox)), ly = Math.floor(y - (p.y - s.oy));
+  if (lx < 0 || ly < 0 || lx >= s.w || ly >= s.h) return false;
+  // 트리 픽셀 근처면 인정(손가락 오차)
+  for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const xx = lx + dx, yy = ly + dy; if (xx >= 0 && yy >= 0 && xx < s.w && yy < s.h && s.color[yy * s.w + xx]) return true; }
+  return false;
+}
+function tapTree(x, y) {
+  if (tree.boom >= 0) return;
+  const now = performance.now();
+  tree.taps = tree.taps.filter((t) => now - t < TAP_WINDOW); tree.taps.push(now);
+  tree.shake = 0.25;
+  tree.sparks.push({ x, y, t: 0, n: tree.taps.length });
+  if (tree.taps.length >= TAPS_NEEDED) {
+    tree.taps = [];
+    setTimeout(askReset, 30);
+  }
+}
+async function askReset() {
+  if (!confirm("🎄 트리를 터뜨려서 광장을 초기화할까요?\n모든 기기의 입장 명단과 채팅이 지워져요.")) return;
+  let key = savedKey();
+  if (!key) { key = (prompt("관리자 코드를 입력하세요.") || "").trim(); if (!key) return; }
+  explodeTree();
+  setTimeout(async () => {
+    try { await resetAll(key); saveKey(key); }
+    catch (e) { saveKey(""); alert(e.message === "forbidden" ? "관리자 코드가 맞지 않아요. 초기화되지 않았어요." : "초기화에 실패했어요."); }
+  }, 700);
+}
+function explodeTree() {
+  const p = treeProp(), s = p.spr;
+  tree.boom = 0; tree.bits = [];
+  // 트리 픽셀을 조각내서 사방으로
+  for (let n = 0; n < 900; n++) {
+    const x = Math.floor(Math.random() * s.w), y = Math.floor(Math.random() * s.h), c = s.color[y * s.w + x];
+    if (!c) continue;
+    const wx = p.x - s.ox + x, wy = p.y - s.oy + y, cy = p.y - 60;
+    const ang = Math.atan2(wy - cy, wx - p.x) + (Math.random() - 0.5) * 0.6, sp = 40 + Math.random() * 150;
+    tree.bits.push({ x: wx, y: wy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 60 - Math.random() * 80, c, life: 1.2 + Math.random() * 1.4, big: Math.random() < 0.18 });
+  }
+  for (const b of s.bulbs) tree.bits.push({ x: p.x + b.x, y: p.y + b.y, vx: (Math.random() - 0.5) * 260, vy: -120 - Math.random() * 160, c: b.c, life: 2 + Math.random(), big: true, glow: true });
+  const st = $("#stage"); st.classList.remove("boom"); void st.offsetWidth; st.classList.add("boom");
+  for (const r of people) { if (r.state !== "ride") { r.hop = 0.8; if (Math.random() < 0.5) r.play(exclamation, false); } }
+}
+function drawTreeFx(dt) {
+  const p = painterFor(frame);
+  for (const k of tree.sparks) {
+    k.t += dt;
+    const u = k.t / 0.45;
+    sparkleAt(p, k.x, k.y, u, k.n);
+  }
+  tree.sparks = tree.sparks.filter((k) => k.t < 0.45);
+  if (tree.shake > 0) tree.shake -= dt;
+  if (tree.boom < 0) return;
+  tree.boom += dt;
+  const tp = treeProp(), cx = tp.x, cy = tp.y - 60, b = tree.boom;
+  // 섬광 + 충격파
+  if (b < 0.5) { p.glow(cx, cy, 40 + b * 200, C("#ffffff"), 0.9 * (1 - b / 0.5)); }
+  if (b < 0.9) { const R = 10 + b * 320; p.ring(cx, cy + 30, R, 2, C("#fff3c0"), 1 - b / 0.9); p.glowRing(cx, cy + 30, R, 6, C("#ffd84a"), 0.5 * (1 - b / 0.9)); }
+  for (const t of tree.bits) {
+    t.vy += 260 * dt; t.x += t.vx * dt; t.y += t.vy * dt; t.vx *= 1 - dt * 0.6;
+    const a = Math.max(0, 1 - b / t.life);
+    if (a <= 0) continue;
+    p.dot(Math.round(t.x), Math.round(t.y), t.c, a);
+    if (t.big) p.dot(Math.round(t.x) + 1, Math.round(t.y), t.c, a), p.dot(Math.round(t.x), Math.round(t.y) + 1, t.c, a);
+    if (t.glow) p.light(t.x, t.y, t.c, 0.6 * a);
+  }
+  // 다시 자라나는 트리: 반짝이 기둥
+  if (b > 2.6 && b < 3.4) { const u = (b - 2.6) / 0.8; p.glow(cx, cy, 30, C("#5ae08a"), 0.5 * Math.sin(u * Math.PI)); }
+  if (b > 3.4) { tree.boom = -1; tree.bits = []; }
+}
+function sparkleAt(p, x, y, u, n) {
+  const a = 1 - u, r = 2 + u * 6, c = n >= TAPS_NEEDED - 8 ? C("#ff5a5a") : C("#fff3c0");
+  for (let i = 0; i < 6; i++) { const an = (i / 6) * Math.PI * 2; p.dot(Math.round(x + Math.cos(an) * r), Math.round(y + Math.sin(an) * r), c, a); }
+  p.glow(x, y, 6, c, 0.4 * a);
+}
+const treeVisible = () => tree.boom < 0 || tree.boom > 3.0;
+
 // 클릭 → 그 사람이 반응
 ov.addEventListener("pointerdown", (e) => {
   const rect = ov.getBoundingClientRect(), x = (e.clientX - rect.left) / S, y = (e.clientY - rect.top) / S;
+  if (hitTree(x, y)) { tapTree(x, y); return; }
   let best = null, bd = 1e9;
   for (const r of people) { const d = Math.hypot(r.x - x, r.y - 12 - y); if (d < 16 && d < bd) { bd = d; best = r; } }
   if (best) best.react();
@@ -703,7 +796,7 @@ $("#rand5").addEventListener("click", () => randomArrivals(5));
 $("#reset").addEventListener("click", async () => {
   const key = prompt("모든 기기의 참석 명단을 비웁니다. 관리자 코드를 입력하세요.");
   if (!key) return;
-  try { await resetAll(key.trim()); } catch (e) { alert(e.message === "forbidden" ? "관리자 코드가 맞지 않아요." : "초기화에 실패했어요."); }
+  try { await resetAll(key.trim()); saveKey(key.trim()); } catch (e) { alert(e.message === "forbidden" ? "관리자 코드가 맞지 않아요." : "초기화에 실패했어요."); }
 });
 
 buildBackground();

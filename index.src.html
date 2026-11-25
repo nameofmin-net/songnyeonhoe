@@ -12,6 +12,8 @@
   body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 8px 12px; overflow: hidden; }
   .row { display: flex; gap: 12px; align-items: stretch; justify-content: center; max-width: 100%; }
   #stage { position: relative; flex: none; box-shadow: 0 0 0 3px #1c1624, 0 0 0 6px var(--line), 0 20px 60px #000a; }
+  #stage.boom { animation: boom .7s cubic-bezier(.25,1,.5,1); }
+  @keyframes boom { 0%,100% { transform: none; } 10% { transform: translate(-8px, 4px); } 25% { transform: translate(7px, -5px); } 40% { transform: translate(-5px, 3px); } 60% { transform: translate(3px, -2px); } 80% { transform: translate(-1px, 1px); } }
   #stage canvas { position: absolute; inset: 0; image-rendering: pixelated; image-rendering: crisp-edges; }
   #overlay { cursor: pointer; }
 
