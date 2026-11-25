@@ -90,7 +90,7 @@ const CSS = `
 .jf .btn { font: inherit; font-size: 16px; padding: 12px; color: #1c1624; background: #ffd84a; border: 2px solid #fff3b0; box-shadow: 0 4px 0 #8a6a10; cursor: pointer; }
 .jf .btn:disabled { background: #4a3f6a; border-color: #5a4f7a; color: #9a90b0; box-shadow: none; cursor: default; }
 .jf .btn.sub { background: #2a2140; color: #f4eefc; border-color: #4a3f6a; box-shadow: 0 3px 0 #0008; font-size: 14px; padding: 10px; }
-.jf .note { font-size: 13px; line-height: 1.5; padding: 10px 12px; background: #2a2140; border-left: 3px solid #ffd84a; color: #fff3c0; }
+.jf .note { font-size: 13px; line-height: 1.5; padding: 10px 12px; background: #2a2140; border: 1px solid #5a4a30; color: #fff3c0; }
 .jf .note:empty { display: none; }
 .jf .msg { text-align: center; font-size: 13px; color: #ffd84a; min-height: 1.2em; }
 /* 내 캐릭터 */

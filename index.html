@@ -36,7 +36,7 @@
 
   /* 입장 알림 */
   #announce { position: absolute; left: 50%; bottom: 6%; transform: translate(-50%, -30px); opacity: 0; pointer-events: none; display: flex; gap: 14px; align-items: center; padding: 12px 22px 12px 14px; background: #1c1624ee; border: 3px solid var(--accent); box-shadow: 0 0 0 3px #1c1624, 0 12px 30px #000a; max-width: 80%; }
-  #announce.on { animation: ann 4.2s cubic-bezier(.2,1.4,.4,1) forwards; }
+  #announce.on { animation: ann 4.2s cubic-bezier(.25,1,.5,1) forwards; }
   #announce img { width: 36px; height: 56px; image-rendering: pixelated; flex: none; }
   #announce b { font-size: 18px; display: block; }
   #announce b .M { color: var(--m); } #announce b .F { color: var(--f); }
@@ -106,7 +106,7 @@
 .jf .btn { font: inherit; font-size: 16px; padding: 12px; color: #1c1624; background: #ffd84a; border: 2px solid #fff3b0; box-shadow: 0 4px 0 #8a6a10; cursor: pointer; }
 .jf .btn:disabled { background: #4a3f6a; border-color: #5a4f7a; color: #9a90b0; box-shadow: none; cursor: default; }
 .jf .btn.sub { background: #2a2140; color: #f4eefc; border-color: #4a3f6a; box-shadow: 0 3px 0 #0008; font-size: 14px; padding: 10px; }
-.jf .note { font-size: 13px; line-height: 1.5; padding: 10px 12px; background: #2a2140; border-left: 3px solid #ffd84a; color: #fff3c0; }
+.jf .note { font-size: 13px; line-height: 1.5; padding: 10px 12px; background: #2a2140; border: 1px solid #5a4a30; color: #fff3c0; }
 .jf .note:empty { display: none; }
 .jf .msg { text-align: center; font-size: 13px; color: #ffd84a; min-height: 1.2em; }
 /* 내 캐릭터 */
