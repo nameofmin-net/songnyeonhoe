@@ -18,7 +18,7 @@
   #show .curtain { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
   #show .pp { position: relative; visibility: hidden; }
   #show .pp.go { visibility: visible; }
-  #show .pp canvas { height: var(--ph, 15cqh); aspect-ratio: 18 / 28; image-rendering: pixelated; filter: drop-shadow(0 0 1.2cqw #ffd84a55); display: block; }
+  #show .pp canvas { position: static; inset: auto; width: auto; height: var(--ph, 15cqh); aspect-ratio: 18 / 28; image-rendering: pixelated; filter: drop-shadow(0 0 1.2cqw #ffd84a55); display: block; }
   #show .pp b { opacity: 0; transition: opacity .4s; }
   #show .pp.here b { opacity: 1; }
   #show .pp .bub { position: absolute; bottom: calc(100% + .6cqh); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: var(--pf, 2.2cqw); background: #fff; color: #1c1624; padding: .4cqh .9cqw; box-shadow: 0 0 0 .25cqw #1c1624; opacity: 0; transition: opacity .25s, transform .25s; z-index: 2; }
@@ -44,7 +44,7 @@
   #show .sh-t { font-size: 7.2cqw; font-weight: bold; color: #ffd84a; text-shadow: 0 .5cqw 0 #8a3a10, 0 0 3cqw #ffb84a88; letter-spacing: .05em; transition: font-size .6s cubic-bezier(.25,1,.5,1); word-break: keep-all; line-height: 1.25; }
   #show .sh-t small { display: block; font-size: 2.1cqw; color: #ffc2dc; letter-spacing: .3em; margin-bottom: 1.2cqh; text-shadow: none; font-weight: normal; }
   #show .sh-s { font-size: 3.6cqw; color: #fff; padding: .8cqh 3cqw; border: .35cqw solid #ffd84a; background: #1c1624cc; display: none; }
-  #show .ppl { display: none; flex-wrap: wrap; justify-content: center; gap: 1.6cqh 2.2cqw; max-width: 92cqw; }
+  #show .ppl { display: none; flex-wrap: wrap; justify-content: center; gap: 7cqh 2.2cqw; max-width: 92cqw; margin-top: 6cqh; }
   #show .pp { display: flex; flex-direction: column; align-items: center; gap: .6cqh; }
   #show .pp img { height: var(--ph, 15cqh); image-rendering: pixelated; filter: drop-shadow(0 0 1.2cqw #ffd84a66); }
   #show .pp b { font-size: var(--pf, 2.2cqw); font-weight: normal; background: #1c1624dd; padding: .2cqh .8cqw; }
