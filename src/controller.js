@@ -118,24 +118,31 @@ export function mountController({ entries }) {
     </div>`;
   }
 
-  function renderEdit() {
+  // 체크·검색·정렬은 목록 부분만 바꿔서 화면이 위로 튀지 않게 한다
+  function listHTML() {
     const here = entries();
     let ids = ALL.map((d) => d.id);
     if (query) ids = ids.filter((id) => ALL[id].name.includes(query));
     ids = sortedByName(ids);
     if (sortMode === "here") ids = [...ids.filter((id) => here.has(id)), ...ids.filter((id) => !here.has(id))];
     const pickedSet = new Set(draft.people);
+    return ids.map((id) => `<label class="${pickedSet.has(id) ? "on" : ""}"><input type="checkbox" data-id="${id}" ${pickedSet.has(id) ? "checked" : ""}><img src="${avatarURL(id, 2, true)}" alt=""><span class="nm">${esc(ALL[id].name)}${ALL[id].rank ? `<small>${ALL[id].rank}</small>` : ""}</span>${here.has(id) ? `<span class="in">입장</span>` : ""}</label>`).join("") || `<div class="empty">'${esc(query)}' 이름이 없어요</div>`;
+  }
+  const pickedHTML = () => (draft.people.length ? draft.people.map((id) => `<button data-a="unpick" data-id="${id}">${esc(ALL[id].name)} ✕</button>`).join("") : `<span class="none">아래에서 체크해 주세요</span>`);
+  function refreshPicked() { el.querySelector(".picked").innerHTML = pickedHTML(); el.querySelector(".pcnt").textContent = draft.people.length; }
+  function refreshList() { el.querySelector(".plist").innerHTML = listHTML(); }
+  function renderEdit() {
     el.innerHTML = `
       <div class="ctl-head"><b>${draft.sid ? "메뉴 수정" : "새 메뉴"}</b><button data-a="back">취소</button></div>
       <div class="ctl-body">
         <label class="f">메뉴명 <small>컨트롤러 목록에 보이는 이름</small><input type="text" data-f="name" maxlength="30" value="${esc(draft.name)}" placeholder="예) 프로젝트 공로상"></label>
         <label class="f">타이틀 <small>커튼이 열리면 가장 먼저 크게 나와요</small><input type="text" data-f="title" maxlength="40" value="${esc(draft.title)}" placeholder="비우면 메뉴명과 같게"></label>
         <label class="f">서브 제목 <small>'다음'을 누르면 나와요 (프로젝트 이름)</small><input type="text" data-f="sub" maxlength="60" value="${esc(draft.sub)}" placeholder="예) KB손해보험 UX 전담반"></label>
-        <div class="f" style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:#c9c0dc">수상자 선택 (${draft.people.length}명)
-          <div class="picked">${draft.people.length ? draft.people.map((id) => `<button data-a="unpick" data-id="${id}">${esc(ALL[id].name)} ✕</button>`).join("") : `<span class="none">아래에서 체크해 주세요</span>`}</div>
+        <div class="f" style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:#c9c0dc">수상자 선택 (<span class="pcnt">${draft.people.length}</span>명)
           <input type="search" data-f="q" value="${esc(query)}" placeholder="이름 검색">
           <div class="seg"><button data-a="sort" data-v="here" class="${sortMode === "here" ? "on" : ""}">입장한 사람 먼저</button><button data-a="sort" data-v="abc" class="${sortMode === "abc" ? "on" : ""}">가나다순</button></div>
-          <div class="plist">${ids.map((id) => `<label class="${pickedSet.has(id) ? "on" : ""}"><input type="checkbox" data-id="${id}" ${pickedSet.has(id) ? "checked" : ""}><img src="${avatarURL(id, 2, true)}" alt=""><span class="nm">${esc(ALL[id].name)}${ALL[id].rank ? `<small>${ALL[id].rank}</small>` : ""}</span>${here.has(id) ? `<span class="in">입장</span>` : ""}</label>`).join("") || `<div class="empty">'${esc(query)}' 이름이 없어요</div>`}</div>
+          <div class="plist">${listHTML()}</div>
+          <div class="picked">${pickedHTML()}</div>
         </div>
         <button class="big" data-a="save" ${busy ? "disabled" : ""}>저장</button>
         <div class="msg">${esc(msg)}</div>
@@ -145,14 +152,15 @@ export function mountController({ entries }) {
   // 입력값은 렌더 없이 draft에 반영(키보드가 닫히지 않게)
   el.addEventListener("input", (e) => {
     const f = e.target.dataset.f; if (!f || !draft) return;
-    if (f === "q") { query = e.target.value.trim(); const pos = e.target.selectionStart; renderEdit(); const q = el.querySelector("[data-f=q]"); q.focus(); try { q.setSelectionRange(pos, pos); } catch {} return; }
+    if (f === "q") { query = e.target.value.trim(); refreshList(); el.querySelector(".plist").scrollTop = 0; return; }
     draft[f] = e.target.value;
   });
   el.addEventListener("change", (e) => {
     const id = e.target.dataset.id; if (id === undefined || e.target.type !== "checkbox") return;
     const n = +id;
     draft.people = e.target.checked ? [...draft.people, n] : draft.people.filter((x) => x !== n);
-    const sc = el.querySelector(".plist").scrollTop; renderEdit(); el.querySelector(".plist").scrollTop = sc;
+    e.target.closest("label")?.classList.toggle("on", e.target.checked);
+    refreshPicked();
   });
   el.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-a]"); if (!b || b.disabled) return;
@@ -161,8 +169,12 @@ export function mountController({ entries }) {
     if (a === "new") { draft = { sid: 0, name: "", title: "", sub: "", people: [] }; query = ""; msg = ""; view = "edit"; return render(); }
     if (a === "edit") { const m = menus.find((x) => x.sid === sid); draft = { ...m, people: [...m.people] }; query = ""; msg = ""; view = "edit"; return render(); }
     if (a === "back") { view = "list"; msg = ""; return render(); }
-    if (a === "sort") { sortMode = b.dataset.v; return renderEdit(); }
-    if (a === "unpick") { draft.people = draft.people.filter((x) => x !== +b.dataset.id); return renderEdit(); }
+    if (a === "sort") { sortMode = b.dataset.v; el.querySelectorAll(".seg button").forEach((x) => x.classList.toggle("on", x.dataset.v === sortMode)); refreshList(); return; }
+    if (a === "unpick") {
+      const n = +b.dataset.id; draft.people = draft.people.filter((x) => x !== n);
+      const cb = el.querySelector(`.plist input[data-id="${n}"]`); if (cb) { cb.checked = false; cb.closest("label").classList.remove("on"); }
+      refreshPicked(); return;
+    }
     if (a === "save") {
       if (!draft.name.trim()) { msg = "메뉴명을 적어 주세요."; return renderEdit(); }
       const body = { ...draft, title: draft.title.trim() || draft.name.trim() };
