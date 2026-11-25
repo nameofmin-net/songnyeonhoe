@@ -3,6 +3,7 @@ import { makePopulation, renderSprite, applyStyle, optionsFor, LABELS, SW, SH } 
 
 import { ROSTER } from "./roster.js";
 export const ALL = makePopulation(0, 2026, ROSTER);
+ALL.forEach((d, i) => (d.rank = ROSTER[i].rank));
 export const MAX = ALL.length;
 export const byId = (id) => ALL[id];
 export const sortedByName = (ids) => [...ids].sort((a, b) => ALL[a].name.localeCompare(ALL[b].name, "ko"));
@@ -90,9 +91,9 @@ export const avatarURL = (id, k = 3, head = false) => spriteURL(styleOf(id), k, 
 const hhmm = (t) => { const d = new Date(t); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
 export function chatItemHTML(m, meId = null) {
   const d = ALL[m.who]; if (!d) return "";
-  if (m.kind) { const e = emoteOf(m.kind); return `<li class="ce${m.who === meId ? " mine" : ""}"><img src="${avatarURL(m.who, 2, true)}" alt=""><span class="${d.style.gender}">${esc(d.name)}</span> ${e ? e[1] + " " + e[2] + "!" : ""}</li>`; }
+  if (m.kind) { const e = emoteOf(m.kind); return `<li class="ce${m.who === meId ? " mine" : ""}"><img src="${avatarURL(m.who, 2, true)}" alt=""><span class="${d.style.gender}">${esc(d.name)}</span>${d.rank ? `<small class="rk">${d.rank}</small>` : ""} ${e ? e[1] + " " + e[2] + "!" : ""}</li>`; }
   const mine = m.who === meId;
-  return `<li class="ci${mine ? " mine" : ""}" data-cid="${m.cid}"><img src="${avatarURL(m.who, 2, true)}" alt=""><div class="cb"><span class="cn ${d.style.gender}">${esc(d.name)}<time>${hhmm(m.at)}</time></span><p>${esc(m.text)}</p></div></li>`;
+  return `<li class="ci${mine ? " mine" : ""}" data-cid="${m.cid}"><img src="${avatarURL(m.who, 2, true)}" alt=""><div class="cb"><span class="cn ${d.style.gender}">${esc(d.name)}${d.rank ? `<small class="rk">${d.rank}</small>` : ""}<time>${hhmm(m.at)}</time></span><p>${esc(m.text)}</p></div></li>`;
 }
 
 // ---------- 화면 ----------
@@ -140,6 +141,7 @@ const CSS = `
 .ci .cn { font-size: 12px; display: flex; gap: 6px; align-items: baseline; }
 .ci .cn.M { color: #a8d4ff; } .ci .cn.F { color: #ffc2dc; }
 .ci time { font-size: 10px; color: #6a6084; }
+.rk { font-size: 10px; color: #9a90b0; margin-left: 3px; }
 .ci p { margin: 3px 0 0; font-size: 14px; line-height: 1.45; color: #f4eefc; background: #2a2140; padding: 6px 10px; display: inline-block; word-break: keep-all; overflow-wrap: anywhere; }
 .ci.mine { flex-direction: row-reverse; text-align: right; }
 .ci.mine .cn { justify-content: flex-end; }
