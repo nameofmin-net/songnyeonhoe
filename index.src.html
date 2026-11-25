@@ -36,6 +36,8 @@
   .panel.chat ul { padding: 8px; }
   .panel.chat h2 .cnt { font-size: 11px; color: var(--dim); }
   .panel.chat .sub { border-bottom: 0; border-top: 2px solid var(--line); text-align: center; }
+  .panel.chat .qr { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 8px 14px; text-align: left; line-height: 1.5; }
+  .panel.chat .qr img { width: 64px; height: 64px; background: #fff; padding: 3px; flex: none; image-rendering: pixelated; }
   .panel.chat li.empty { flex-direction: column; }
   .panel.chat .ci { padding: 5px 2px; align-items: flex-start; }
   .panel.chat .ci.new { animation: flash 2s ease-out; }
@@ -96,7 +98,7 @@
       <section class="panel chat">
         <h2>실시간 채팅 <span class="cnt" id="chatN"></span></h2>
         <ul id="chatList"></ul>
-        <div class="sub">휴대폰으로 입장하면 채팅할 수 있어요</div>
+        <div class="sub qr"><img src="qr.svg" alt="입장 QR"><span>휴대폰으로 찍고<br>입장 · 채팅하기</span></div>
       </section>
     </div>
   </div>
