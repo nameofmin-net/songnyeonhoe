@@ -169,6 +169,7 @@ function buildProps() {
 }
 
 function blocked(x, y) {
+  if (typeof quizSt !== "undefined" && quizSt.q) return x < 12 || x > W - 12 || y < WALL + 16 || y > H - 6;
   if (x < 12 || x > W - 12 || y < FLOOR_TOP + 10 || y > H - 6) return true;
   if (x + (H - y) * 1.1 < 96 || W - x + (H - y) * 1.1 < 96) return true; // 화단
   for (const b of blocks) {
@@ -1254,7 +1255,8 @@ function middleSpot() { return { x: W / 2 + (Math.random() - 0.5) * 70, y: WALL 
 function placeQuiz(r) {
   if (r.d.npc) { r.seat = { x: r.d.id === -1 ? CX - 60 : CX + 60, y: WALL + 22, stand: true, face: 0 }; return; }
   const v = quizSt.votes[r.d.id];
-  const s = v === "O" ? spotIn(O_ZONE) : v === "X" ? spotIn(X_ZONE) : middleSpot();
+  if (!v) { r.seat = null; if (r.state === "sit") r.state = "idle"; r.timer = Math.random() * 1.5; return; } // 안 고른 사람은 운동장을 자유롭게 돌아다님
+  const s = v === "O" ? spotIn(O_ZONE) : spotIn(X_ZONE);
   if ((quizSt.q?.out || []).includes(r.d.id) && quizSt.q?.phase !== "reveal") { r.zapped = true; r.seat = null; return; }
   r.seat = { x: s.x, y: s.y, stand: true, face: 1, fast: true }; r.timer = 0;
 }
