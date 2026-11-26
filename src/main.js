@@ -63,6 +63,7 @@ const frame = createFrame(W, H);
 const bg = new Uint32Array(W * H);
 const staticLight = new Uint32Array(W * H);
 const FLOOR_TOP = 44;
+let officeOn = false, officeScene; // 사옥 모드(이스터에그)
 
 function hash2(x, y) { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
 
@@ -172,7 +173,7 @@ function buildProps() {
   for (const [x, y] of [[36, 100], [W - 36, 100], [Math.round(CX - W * 0.36), 344], [Math.round(CX + W * 0.36), 344]]) addProp(treeSpr, x, y, [x - 14, y - 6, x + 14, y + 3]);
   for (const [x, y] of [[CX - 110, 262], [CX + 110, 262], [CX - 88, 108], [CX + 88, 108], [CX, 336]]) addProp(potSpr, x, y, [x - 8, y - 4, x + 8, y + 2]);
   // 12시 방향 단상
-  addProp(podium, CX, 104, [CX - 76, 44, CX + 76, 108], [CX, 70, 60, "#fff0c0", 0.25]);
+  addProp(podium, CX, 104, Object.assign([CX - 76, 44, CX + 76, 108], { podium: true }), [CX, 70, 60, "#fff0c0", 0.25]);
   // 중앙 대형 트리
   addProp(bigTree, CX, FY + 20, null);
   blocks.push({ ell: [CX, FY + 12, 62, 16], tree: true });
@@ -181,8 +182,9 @@ function buildProps() {
 function blocked(x, y) {
   if (typeof quizSt !== "undefined" && quizSt.q) return x < 12 || x > W - 12 || y < WALL + 16 || y > H - 6;
   if (x < 12 || x > W - 12 || y < FLOOR_TOP + 10 || y > H - 6) return true;
-  if (x + (H - y) * 1.1 < 96 || W - x + (H - y) * 1.1 < 96) return true; // 화단
+  if (!officeOn && (x + (H - y) * 1.1 < 96 || W - x + (H - y) * 1.1 < 96)) return true; // 화단
   for (const b of blocks) {
+    if (b.podium && officeOn && !ceremony?.on) continue;
     if (b.tree && ceremony?.on) continue;
     if (b.ell) { const [cx, cy, rx, ry] = b.ell; if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 < 1) return true; }
     else if (x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]) return true;
@@ -520,7 +522,7 @@ function drawOverlay() {
   const nameF = Math.round(small * 1.3), talkF = Math.round(small * 1.5);
 
   // 현수막(퀴즈 운동장에선 숨김)
-  if (!quizVis) {
+  if (!quizVis && !officeOn) {
     const cx = CX * S, cy = 30 * S;
     c.font = `bold ${big}px Galmuri14, "Apple SD Gothic Neo", sans-serif`;
     const t = "🎉 2026 U PLEAT 송년회 🎉", tw = c.measureText(t).width + 24;
@@ -746,6 +748,7 @@ function tick(nowMs) {
   for (const it of items) {
     if (it.r) it.r.draw();
     else if (it.p) {
+      if (officeOn && it.p.spr === podium && !ceremony?.on) continue;
       if (it.p.spr === bigTree) {
         const from = treeFromRow();
         if (from >= bigTree.h) continue;
@@ -892,7 +895,7 @@ function sparkleAt(p, x, y, u, n) {
 const treeFromRow = () => (tree.gone ? bigTree.h : tree.boom < 0 ? 0 : Math.ceil(bigTree.h * (1 - growOf(tree.boom))));
 
 // ---------- 이스터에그: 단상 뒤 출입문 더블클릭 → 유플리트 사옥 ⇄ 광장 ----------
-let officeOn = false, officeScene = null;
+officeScene = null;
 const OFFICE_SWAP = new Map([[lampSpr, officeLamp], [benchSpr, officeSofa], [treeSpr, officePlant], [potSpr, officeTable]]);
 function toggleOffice() {
   if (!officeScene) officeScene = buildOfficeBg(W, H, CX, FY, FLOOR_TOP, props.filter((p) => p.spr === lampSpr).map((p) => [p.x, p.y]));

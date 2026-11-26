@@ -71,12 +71,6 @@ export function buildOfficeBg(W, H, CX, FY, FLOOR_TOP, lamps) {
     if (rr < 1) c = rr > 0.8 ? "#1a43b8" : h2(x, y) < 0.08 ? "#2a5ae0" : "#1e4fd6";
     f.color[y * W + x] = C(c);
   }
-  // 아래 양 모서리: 흰 플랜터 + 초록
-  for (const sx of [1, -1]) for (let y = H - 60; y < H; y++) for (let x = 0; x < 70; x++) {
-    const px = sx > 0 ? x : W - 1 - x, k = x + (H - y) * 1.1;
-    if (k > 92) continue;
-    f.color[y * W + px] = C(k > 88 ? "#b8b6b0" : k > 84 ? "#f4f4f2" : h2(px, y) < 0.15 ? "#6cbf5a" : (x + y) % 5 === 0 ? "#2f7a44" : "#45994f");
-  }
   for (const [x, y] of lamps) p.glow(x, y - 30, 40, C("#fff6e0"), 0.15);
   p.glow(CX, FY - 40, 140, C("#ffffff"), 0.06);
   const bg = new Uint32Array(W * H), light = new Uint32Array(W * H);
