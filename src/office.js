@@ -37,12 +37,16 @@ export function officeLayout(W, H) {
   const tw = K.bx1 - K.bx0;
   for (let i = 0; i < 3; i++) { const sx = K.bx0 + 9 + Math.round(i * (tw - 18) / 2); seats.push({ x: sx, y: K.by0 - 5, face: 0, kind: "bar" }, { x: sx, y: K.by0 + 29, face: 1, kind: "bar" }); }
   seats.push({ x: 62, y: K.y0 + 38, face: 1, stand: true, kind: "coffee" }, { x: 32, y: K.y0 + 38, face: 1, stand: true, kind: "water" });
-  // 오른쪽 아래 업무 테이블(마주 보는 2인 책상 묶음)
-  const D = []; const dw = 46, gap = 14, dx0 = Math.round(W * 0.52), dx1 = W - 10;
-  for (const dy of [Math.round(H * 0.7), Math.round(H * 0.85)]) for (let x = dx0; x + dw <= dx1; x += dw + gap) D.push({ x, y: dy, w: dw, h: 18 });
+  // 오른쪽 아래 업무 테이블: 세로로 긴 대형 테이블 3개, 좌3·우3 마주 앉기
+  const D = [], tw2 = 20, th2 = 64, rx0 = Math.round(W * 0.53), rx1 = W - 12, ty = Math.round(H * 0.7);
+  const span = (rx1 - rx0) / 3;
+  for (let i = 0; i < 3; i++) D.push({ x: Math.round(rx0 + span * (i + 0.5) - tw2 / 2), y: ty, w: tw2, h: th2 });
   for (const d of D) {
-    blocks.push([d.x - 1, d.y - 1, d.x + d.w + 1, d.y + d.h + 1]);
-    for (const sx of [d.x + 12, d.x + d.w - 12]) seats.push({ x: sx, y: d.y - 2, face: 0, kind: "desk" }, { x: sx, y: d.y + d.h + 10, face: 1, kind: "desk" });
+    blocks.push([d.x - 1, d.y - 2, d.x + d.w + 1, d.y + d.h + 1]);
+    for (let k = 0; k < 3; k++) {
+      const yy = d.y + 14 + k * 20;
+      seats.push({ x: d.x - 8, y: yy, face: 2, flip: false, kind: "desk" }, { x: d.x + d.w + 8, y: yy, face: 2, flip: true, kind: "desk" });
+    }
   }
   const doorIn = { x: Math.round((K.cw + K.x1) / 2), y: K.y0 + 14 }, doorOut = { x: Math.round((K.cw + K.x1) / 2), y: K.y0 - 12 };
   return { L, K, tree, blocks, seats, doorIn, doorOut, D };
@@ -167,21 +171,22 @@ export function buildOfficeBg(W, H, CX, FY, FLOOR_TOP) {
   for (let i = 0; i < 3; i++) { const sx = K.bx0 + 9 + Math.round(i * (tw - 18) / 2); stool(sx, K.by0 - 8); stool(sx, K.by0 + 26); }
   // 트랙 조명 빛
   for (let x = 20; x < cw; x += 34) p.glow(x, y0 + 30, 16, C("#fff2d8"), 0.06);
-  // 업무 테이블: 화이트 상판 + 가운데 칸막이 + 모니터(양쪽) + 화이트 의자
+  // 업무 테이블(세로형): 화이트 상판 + 가운데 칸막이 + 양쪽 모니터·키보드 + 화이트 의자
   for (const d of D) {
-    const mid = d.y + d.h / 2;
-    p.rect(d.x, d.y, d.w, d.h, C("#fafaf8")); p.rect(d.x, d.y, d.w, 1, C("#ffffff")); p.rect(d.x, d.y + d.h - 1, d.w, 1, C("#c4c2bc")); p.rect(d.x + d.w / 2, d.y, 1, d.h, C("#e0deda"));
-    p.rect(d.x + 1, mid - 1, d.w - 2, 2, C("#b8bcc2")); // 칸막이
-    for (const mx of [d.x + 6, d.x + d.w - 18]) {
-      p.rect(mx, mid - 6, 12, 5, C("#1c1c22")); p.rect(mx + 1, mid - 5, 10, 3, C("#4a7fd4")); // 위쪽 사람 모니터(뒷면 아님: 아래서 봄)
-      p.rect(mx, mid + 1, 12, 5, C("#1c1c22")); p.rect(mx + 1, mid + 2, 10, 1, C("#3a3a42"));
-      p.rect(mx + 3, d.y + 1, 6, 2, C("#e8e8ea")); p.rect(mx + 3, d.y + d.h - 3, 6, 2, C("#e8e8ea")); // 키보드
+    const mid = d.x + d.w / 2;
+    p.rect(d.x, d.y, d.w, d.h, C("#fafaf8")); p.rect(d.x, d.y, d.w, 1, C("#ffffff")); p.rect(d.x, d.y + d.h - 1, d.w, 1, C("#c4c2bc")); p.rect(d.x + d.w - 1, d.y, 1, d.h, C("#d8d6d0"));
+    p.rect(mid - 1, d.y + 1, 2, d.h - 2, C("#b8bcc2"));
+    for (let k = 0; k < 3; k++) {
+      const yy = d.y + 4 + k * 20;
+      p.rect(mid - 5, yy, 3, 10, C("#1c1c22")); p.rect(mid - 5, yy + 1, 1, 8, C("#4a7fd4")); // 왼쪽 사람 모니터
+      p.rect(mid + 2, yy, 3, 10, C("#1c1c22")); p.rect(mid + 4, yy + 1, 1, 8, C("#4a7fd4")); // 오른쪽 사람 모니터
+      p.rect(d.x + 1, yy + 3, 2, 5, C("#e2e2e4")); p.rect(d.x + d.w - 3, yy + 3, 2, 5, C("#e2e2e4")); // 키보드
+      if (k === 1) { p.rect(d.x + 3, yy + 10, 2, 2, C("#ffffff")); p.rect(d.x + d.w - 5, yy - 2, 2, 2, C("#e8b44a")); } // 머그
+      for (const [cx, side] of [[d.x - 7, -1], [d.x + d.w + 6, 1]]) {
+        p.rect(cx - 3, yy + 2, 7, 8, C("#e4e4e6")); p.rect(side < 0 ? cx - 4 : cx + 3, yy + 1, 2, 10, C("#c8c8cc"));
+      }
     }
-    p.rect(d.x + d.w / 2 + 6, d.y + 2, 3, 3, C("#ffffff")); p.rect(d.x + d.w / 2 + 7, d.y + 3, 1, 1, C("#6a3a2a")); // 머그
-    for (const sx of [d.x + 12, d.x + d.w - 12]) for (const [cy, top] of [[d.y - 6, true], [d.y + d.h + 5, false]]) {
-      p.rect(sx - 5, cy - 3, 10, 7, C("#e4e4e6")); p.rect(sx - 5, top ? cy - 4 : cy + 3, 10, 2, C("#c8c8cc")); p.rect(sx - 1, cy + 4, 2, 1, C("#8a8a92"));
-    }
-    p.glow(d.x + d.w / 2, mid, 22, C("#cfe0ff"), 0.06);
+    p.glow(mid, d.y + d.h / 2, 26, C("#cfe0ff"), 0.06);
   }
   // 펜던트 조명 빛
   p.glow((L.tx0 + L.tx1) / 2, (L.ty0 + L.ty1) / 2, 70, C("#ffffff"), 0.12);
