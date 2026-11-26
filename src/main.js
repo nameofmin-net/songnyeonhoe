@@ -932,11 +932,15 @@ const OFFICE = officeLayout(W, H);
 const TV_DEFAULT = "q-ZFpbrokMg";
 function ytId(v) { if (!v) return ""; const m = String(v).match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/); return m ? m[1] : /^[\w-]{11}$/.test(v) ? v : ""; }
 let tvBox = null, tvPlaying = false, tvId = "";
+// 크롬은 사용자 조작 없이 소리를 켜면 영상을 멈춰 버린다 → 음소거로 먼저 재생하고, 화면을 처음 누를 때 소리를 켠다
+let tvUnmuted = 0;
+addEventListener("pointerdown", () => { if (tvBox && !tvUnmuted) { tvUnmuted = performance.now(); tvCmd("unMute"); tvCmd("setVolume", [80]); tvCmd("playVideo"); tvPlaying = true; } }, true);
 const TV_POS_KEY = () => "songnyeonhoe-ytpos-" + tvId;
 function tvCmd(func, args = []) { const f = tvBox?.querySelector("iframe"); f?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*"); }
 // 영상 상태 듣기(자동재생 됐는지 알기 위해)
 addEventListener("message", (e) => { if (!String(e.origin).includes("youtube")) return; try { const m = JSON.parse(e.data); const st = m.info?.playerState; if (st !== undefined) tvPlaying = st === 1 || st === 3; const ct = m.info?.currentTime; if (typeof ct === "number" && ct > 1) { try { localStorage.setItem(TV_POS_KEY(), String(Math.floor(ct))); } catch {} } } catch {} });
 function tvToggle() {
+  if (performance.now() - tvUnmuted < 400) return; // 방금 첫 터치로 소리를 켠 경우
   if (!tvBox) return;
   if (tvPlaying) { tvCmd("pauseVideo"); tvPlaying = false; } else { tvCmd("unMute"); tvCmd("setVolume", [80]); tvCmd("playVideo"); tvPlaying = true; }
   sfx.blip();
@@ -944,7 +948,8 @@ function tvToggle() {
 function hitTv(x, y) { const lw = Math.min(110, Math.round(W * 0.22)); return officeOn && x >= 6 && x <= 10 + lw && y >= 3 && y <= 39; }
 function setTv(on) {
   const id = ytId(params.get("yt")) || ytId((() => { try { return localStorage.getItem("songnyeonhoe-yt"); } catch { return ""; } })()) || TV_DEFAULT;
-  if (!on || !id) { tvBox?.remove(); tvBox = null; return; }
+  tvBox?.remove(); tvBox = null;
+  if (!on || !id) return;
   tvId = id;
   let start = 0; try { start = Math.max(0, (+localStorage.getItem(TV_POS_KEY()) || 0) - 2); } catch {}
   const lw = Math.min(110, Math.round(W * 0.22));
@@ -954,11 +959,11 @@ function setTv(on) {
   // 픽셀 필터(SVG): 블록 하나 = 월드 픽셀 1칸 → 광장과 같은 도트감
   const B = Math.max(2, Math.round(S)), hB = B / 2;
   const svg = `<svg width="0" height="0" style="position:absolute"><filter id="tvpx" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feFlood x="${hB}" y="${hB}" width="1" height="1"/><feComposite width="${B}" height="${B}"/><feTile result="a"/><feComposite in="SourceGraphic" in2="a" operator="in"/><feMorphology operator="dilate" radius="${Math.ceil(hB)}"/></filter></svg>`;
-  tvBox.innerHTML = svg + `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=0&loop=1&playlist=${id}&controls=0&modestbranding=1&playsinline=1&rel=0&enablejsapi=1&start=${start}&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media" style="position:absolute;left:0;top:${(32 * S - h) / 2}px;width:${w}px;height:${h}px;border:0"></iframe>`;
+  tvBox.innerHTML = svg + `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=${navigator.userActivation?.hasBeenActive ? 0 : 1}&loop=1&playlist=${id}&controls=0&modestbranding=1&playsinline=1&rel=0&enablejsapi=1&start=${start}&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media" style="position:absolute;left:0;top:${(32 * S - h) / 2}px;width:${w}px;height:${h}px;border:0"></iframe>`;
   stage.appendChild(tvBox);
   tvPlaying = false;
   const f = tvBox.querySelector("iframe");
-  f.addEventListener("load", () => { f.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: 1 }), "*"); setTimeout(() => { tvCmd("unMute"); tvCmd("playVideo"); }, 600); });
+  f.addEventListener("load", () => { f.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: 1 }), "*"); setTimeout(() => { if (navigator.userActivation?.hasBeenActive) tvCmd("unMute"); tvCmd("playVideo"); }, 600); });
   // 교차 출처 영상엔 픽셀 필터가 안 먹어서, LED 전광판처럼 도트 격자를 덮는다
   const grid = document.createElement("div");
   Object.assign(grid.style, { position: "absolute", inset: 0, pointerEvents: "none",
