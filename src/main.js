@@ -933,12 +933,15 @@ const TV_DEFAULT = "AGGhnmnLqKU";
 function ytId(v) { if (!v) return ""; const m = String(v).match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/); return m ? m[1] : /^[\w-]{11}$/.test(v) ? v : ""; }
 let tvBox = null, tvPlaying = false, tvId = "";
 // 크롬은 사용자 조작 없이 소리를 켜면 영상을 멈춰 버린다 → 음소거로 먼저 재생하고, 화면을 처음 누를 때 소리를 켠다
-let tvUnmuted = 0;
+let tvUnmuted = 0, tvTryUnmute = 0, tvUnmuteAt = 0;
 addEventListener("pointerdown", () => { if (tvBox && !tvUnmuted) { tvUnmuted = performance.now(); tvCmd("unMute"); tvCmd("setVolume", [80]); tvCmd("playVideo"); tvPlaying = true; } }, true);
 const TV_POS_KEY = () => "songnyeonhoe-ytpos-" + tvId;
 function tvCmd(func, args = []) { const f = tvBox?.querySelector("iframe"); f?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*"); }
 // 영상 상태 듣기(자동재생 됐는지 알기 위해)
-addEventListener("message", (e) => { if (!String(e.origin).includes("youtube")) return; try { const m = JSON.parse(e.data); const st = m.info?.playerState; if (st !== undefined) tvPlaying = st === 1 || st === 3; const ct = m.info?.currentTime; if (typeof ct === "number" && ct > 1) { try { localStorage.setItem(TV_POS_KEY(), String(Math.floor(ct))); } catch {} } } catch {} });
+addEventListener("message", (e) => { if (!String(e.origin).includes("youtube")) return; try { const m = JSON.parse(e.data); const st = m.info?.playerState; if (st !== undefined) { tvPlaying = st === 1 || st === 3;
+      // 음소거로 재생이 시작되면 소리 켜기를 시도하고, 크롬이 그 때문에 멈추면 다시 음소거로 재생
+      if (st === 1 && tvTryUnmute && performance.now() > tvTryUnmute - 1500) { tvTryUnmute = 0; tvUnmuteAt = performance.now(); tvCmd("unMute"); tvCmd("setVolume", [80]); }
+      else if (st === 2 && performance.now() - tvUnmuteAt < 2500) { tvUnmuteAt = 0; tvCmd("mute"); tvCmd("playVideo"); } } const ct = m.info?.currentTime; if (typeof ct === "number" && ct > 1) { try { localStorage.setItem(TV_POS_KEY(), String(Math.floor(ct))); } catch {} } } catch {} });
 function tvToggle() {
   if (performance.now() - tvUnmuted < 400) return; // 방금 첫 터치로 소리를 켠 경우
   if (!tvBox) return;
@@ -963,7 +966,7 @@ function setTv(on) {
   stage.appendChild(tvBox);
   tvPlaying = false;
   const f = tvBox.querySelector("iframe");
-  f.addEventListener("load", () => { f.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: 1 }), "*"); setTimeout(() => { if (navigator.userActivation?.hasBeenActive) tvCmd("unMute"); tvCmd("playVideo"); }, 600); });
+  f.addEventListener("load", () => { f.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: 1 }), "*"); setTimeout(() => { tvCmd("playVideo"); tvTryUnmute = performance.now() + 1500; }, 600); });
   // 교차 출처 영상엔 픽셀 필터가 안 먹어서, LED 전광판처럼 도트 격자를 덮는다
   const grid = document.createElement("div");
   Object.assign(grid.style, { position: "absolute", inset: 0, pointerEvents: "none",
