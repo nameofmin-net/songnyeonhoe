@@ -13,6 +13,7 @@ import * as beer from "./beer.js";
 import * as transform from "./transform.js";
 import { drawSpecial, floatOf } from "./special.js";
 import { createCurtain } from "./curtain.js";
+import { buildQuizBg, drawDoll, WALL, O_ZONE, X_ZONE } from "./quiz.js";
 import { sfx, setSound, soundOn, savedPref, setTrack } from "./audio.js";
 import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf, chatItemHTML } from "./joinform.js";
 
@@ -242,7 +243,7 @@ class Resident {
   sprite(dir, step, blink) {
     const k = dir * 10 + step + (blink ? 5 : 0);
     let s = this.cache.get(k);
-    if (!s) this.cache.set(k, (s = renderSprite(this.style, dir, step, blink)));
+    if (!s) this.cache.set(k, (s = renderSprite(quizOn() ? { ...this.style, sp: "track" } : this.style, dir, step, blink)));
     return s;
   }
   get busy() { return this.state === "chat" || this.state === "ride" || this.fx.some((f) => f.loop); }
@@ -504,8 +505,8 @@ function drawOverlay() {
   const small = S >= 4 ? 15 : S >= 2 ? 11 : 10;
   const nameF = Math.round(small * 1.3), talkF = Math.round(small * 1.5);
 
-  // 현수막
-  {
+  // 현수막(퀴즈 운동장에선 숨김)
+  if (!quizOn()) {
     const cx = CX * S, cy = 30 * S;
     c.font = `bold ${big}px Galmuri14, "Apple SD Gothic Neo", sans-serif`;
     const t = "🎉 2026 U PLEAT 송년회 🎉", tw = c.measureText(t).width + 24;
@@ -519,11 +520,12 @@ function drawOverlay() {
   for (const r of list) {
     if (r.hidden || r.state === "ride" || r.state === "sit") continue;
     const x = r.x * S, y = (r.y + 3) * S + nameF * 0.6;
-    const tw = c.measureText(r.name).width + 10;
+    const label = quizOn() && !r.d.npc ? `${String(r.d.id + 1).padStart(3, "0")} ${r.name}` : r.name;
+    const tw = c.measureText(label).width + 10;
     c.fillStyle = "rgba(20,14,30,0.72)";
     c.fillRect(Math.round(x - tw / 2), Math.round(y - nameF * 0.62), Math.round(tw), Math.round(nameF * 1.3));
     c.fillStyle = r.d.npc ? "#ffd84a" : r.style.gender === "M" ? "#a8d4ff" : "#ffc2dc";
-    c.fillText(r.name, x, y + 1);
+    c.fillText(label, x, y + 1);
   }
   // 말풍선
   c.font = `${talkF}px Galmuri14, "Apple SD Gothic Neo", sans-serif`;
@@ -701,8 +703,10 @@ function tick(nowMs) {
   chats();
 
   frame.color.fill(0); frame.light.set(staticLight);
-  drawGarland(now);
-  const items = [...people.map((r) => ({ y: r.onStage ? 104.5 : r.y, r })), ...props.map((p) => ({ y: p.y, p }))];
+  const Q = quizOn();
+  if (Q) frame.light.set(quizScene.light); else drawGarland(now);
+  if (Q) drawDoll(painterFor(frame), CX, WALL + 6, quizSt.dollFront, quizSt.dollFront && quizSt.q?.phase === "reveal", now);
+  const items = [...people.map((r) => ({ y: r.onStage ? 104.5 : r.y, r })), ...(Q ? [] : props.map((p) => ({ y: p.y, p })))];
   items.sort((a, b) => a.y - b.y);
   for (const it of items) {
     if (it.r) it.r.draw();
@@ -719,8 +723,8 @@ function tick(nowMs) {
   for (const it of items) if (it.r) it.r.drawFront();
   drawTreeFx(dt);
   drawDust(dt);
-  drawSnow(dt, now);
-  composite(frame, img.data, bg);
+  if (!Q) drawSnow(dt, now);
+  composite(frame, img.data, Q ? quizScene.bg : bg);
   ctx.putImageData(img, 0, 0);
   drawOverlay();
   requestAnimationFrame(tick);
@@ -1179,7 +1183,68 @@ async function doUpl(sh, isNew) {
   if (sh.step === 2 && prev !== 3) startSpotlight(sh);
   if (sh.step === 3) { if (!showCard.querySelector(".up-2.done")) revealWinner(sh); sfx.fanfare(); sfx.applause(3); confettiRain(); }
 }
-function applyShow(sh) { setTrack(sh ? "award" : "carol"); showChain = showChain.then(() => doShow(sh)).catch(() => {}); }
+function applyShow(sh) { setTrack(sh ? "award" : quizOn() ? "quiz" : "carol"); showChain = showChain.then(() => doShow(sh)).catch(() => {}); }
+
+// ---------- 기본 메뉴: OX 퀴즈 ----------
+var quizSt = { q: null, votes: {}, dollFront: false };
+let quizScene = null;
+function quizOn() { return !!quizSt?.q; }
+const QUIZ_LINES = ["이거 O 아니야?", "X 같은데…", "무궁화 꽃이…", "살려줘요 😱", "확실해!", "아 몰라 찍자", "옆사람 따라가야지", "두근두근", "정답 뭐야??"];
+function spotIn(zone) { for (let i = 0; i < 40; i++) { const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * (zone.r - 14); const x = zone.x + Math.cos(a) * d, y = zone.y + Math.sin(a) * d * 0.8; if (y > WALL + 20 && y < H - 8) return { x, y }; } return { x: zone.x, y: zone.y }; }
+function middleSpot() { return { x: W / 2 + (Math.random() - 0.5) * 70, y: WALL + 34 + Math.random() * (H - WALL - 48) }; }
+function placeQuiz(r) {
+  if (r.d.npc) { r.seat = { x: r.d.id === -1 ? CX - 60 : CX + 60, y: WALL + 22, stand: true, face: 0 }; return; }
+  const v = quizSt.votes[r.d.id];
+  const s = v === "O" ? spotIn(O_ZONE) : v === "X" ? spotIn(X_ZONE) : middleSpot();
+  r.seat = { x: s.x, y: s.y, stand: true, face: 1 }; r.timer = 0;
+}
+function applyQuiz(q, votes) {
+  const was = quizOn(), prevIdx = quizSt.q?.idx, prevPhase = quizSt.q?.phase;
+  quizSt.q = q && q.on ? q : null; quizSt.votes = votes || {};
+  if (quizOn() && !quizScene) quizScene = buildQuizBg(W, H);
+  if (quizOn() !== was) {
+    for (const r of people) { r.cache.clear(); r.actor = actorFor(r.sprite(0, 0, false)); }
+    if (quizOn()) { setTrack("quiz"); sfx.curtain(); for (const r of people) { r.speech = null; placeQuiz(r); } $("#quizBar").hidden = false; }
+    else {
+      setTrack("carol"); $("#quizBar").hidden = true;
+      for (const r of people) { r.seat = null; r.state = "idle"; r.timer = Math.random() * 2; let k = 0; while (blocked(r.x, r.y) && k++ < 80) { r.y += 2; if (r.y > H - 10) { r.y = FLOOR_TOP + 20; r.x = 40 + Math.random() * (W - 80); } } }
+      if (ceremony?.on) seatEveryone();
+      return;
+    }
+  }
+  if (!quizOn()) return;
+  const Qn = quizSt.q;
+  // 새 문제: 모두 가운데로, 인형은 뒤돌아 노래
+  if (Qn.idx !== prevIdx || (Qn.phase === "ask" && prevPhase !== "ask")) {
+    quizSt.dollFront = false;
+    for (const r of people) { placeQuiz(r); r.fx = r.fx.filter((f) => !f.loop); }
+    sfx.drumroll(0.6);
+  }
+  if (Qn.phase === "reveal" && prevPhase !== "reveal") {
+    quizSt.dollFront = true; sfx.boom();
+    setTimeout(() => {
+      for (const r of people) {
+        if (r.d.npc) continue;
+        const v = quizSt.votes[r.d.id];
+        if (v === Qn.a) r.emote("party"); else if (v) { r.play(FX.stunned, true, 4); r.say("으악! 💀", 2.5); } 
+      }
+      sfx.fanfare();
+    }, 900);
+  }
+  renderQuizBar();
+}
+function onVote(m) {
+  if (!quizOn() || m.idx !== quizSt.q.idx) return;
+  quizSt.votes[m.id] = m.pick;
+  const r = people.find((p) => p.d.id === m.id); if (r) { placeQuiz(r); if (Math.random() < 0.4) r.say(choose(QUIZ_LINES), 2); }
+  renderQuizBar();
+}
+function renderQuizBar() {
+  const q = quizSt.q, el = $("#quizBar"); if (!q) return;
+  const c = { O: 0, X: 0 }; Object.values(quizSt.votes).forEach((v) => c[v]++);
+  if (q.phase === "end") { el.innerHTML = `<b>🏁 OX 퀴즈 끝!</b><span>모두 수고했어요</span>`; return; }
+  el.innerHTML = `<small>Q${q.idx + 1}${q.total ? ` / ${q.total}` : ""}</small><b>${esc(q.q)}</b>${q.phase === "reveal" ? `<i class="ans ${q.a === "O" ? "o" : "x"}">정답 ${q.a === "O" ? "⭕" : "❌"}</i>` : ""}<span>⭕ ${c.O} · ❌ ${c.X}</span>`;
+}
 
 // ---------- 기본 메뉴: 시상식 준비 모드 ----------
 const CEO_NAME = "최근화";
@@ -1277,10 +1342,12 @@ connectLive({
   emote: onEmote,
   show: applyShow,
   mode: (m) => setCeremony(m === "ceremony"),
+  quiz: (q, v) => applyQuiz(q, v),
+  vote: onVote,
   status: (on) => { online = on; const el = $("#live"); el.textContent = on ? "● 실시간 연결됨" : "○ 연결 중…"; el.className = on ? "on" : ""; },
 });
 renderLists();
 if (params.get("arrive")) setTimeout(() => randomArrivals(+params.get("arrive"), true), 400);
 // 테스트용(서버에 아무것도 보내지 않음): ?debug 로 열면 콘솔에서 광장 캐릭터를 직접 움직일 수 있다
-if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride, explode: () => explodeTree(), leaveAll: () => { for (const id of [...present.keys()]) leave(id); }, show: (sh) => applyShow(sh), ceremony: (on) => setCeremony(on), arrive: (id, m) => arrive(id, m || "") };
+if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride, explode: () => explodeTree(), leaveAll: () => { for (const id of [...present.keys()]) leave(id); }, show: (sh) => applyShow(sh), quiz: (q, v) => applyQuiz(q, v), vote: onVote, ceremony: (on) => setCeremony(on), arrive: (id, m) => arrive(id, m || "") };
 (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(tick));

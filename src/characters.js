@@ -27,6 +27,7 @@ export const FIXED_TOPS = ["santa", "elf", "santadress"];
 export const SPECIALS = ["none", "gold", "disco", "tree", "neon", "angel"];
 function specialize(st) {
   const sp = st.sp;
+  if (sp === "track") return { ...st, top: "jacket", topColor: "#2f8a6e", top2: "#f4f1ea", bottom: "pants", bottomColor: "#2f8a6e", shoes: "#f4f1ea", hat: "none", acc: "none" };
   if (!sp || sp === "none" || sp.startsWith("npc")) return st;
   const o = { ...st, hat: "none" };
   if (sp === "gold") Object.assign(o, { top: "jacket", topColor: "#f2c84b", top2: "#fff0a0", bottom: "pants", bottomColor: "#d9a92a", shoes: "#f2c84b", acc: "sunglasses" });

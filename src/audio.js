@@ -184,8 +184,20 @@ function scheduleAward() {
   for (const [n, b] of AWARD.notes) { if (n !== "R") { const f = hz(midi(n)); voice(f, t, b * spb, "sawtooth", 0.11, 2200); voice(f / 2, t, b * spb, "square", 0.04, 1500); } t += b * spb; }
   nextT += AWARD.chords.length * bar;
 }
+// OX 퀴즈 BGM: 직접 만든 오르골풍 긴장감 루프(A단조) + 째깍째깍
+const QUIZ = { bpm: 108, mel: "A5 .5 C6 .5 E6 .5 C6 .5 B5 .5 E5 .5 G#5 .5 B5 .5 A5 .5 C6 .5 E6 .5 A6 .5 G#6 1 E6 1 F6 .5 E6 .5 D6 .5 C6 .5 B5 .5 C6 .5 D6 .5 B5 .5 A5 .5 E5 .5 A5 .5 C6 .5 B5 2" };
+QUIZ.notes = parse(QUIZ.mel);
+function scheduleQuiz() {
+  const spb = 60 / QUIZ.bpm; let t = nextT;
+  for (const [n, b] of QUIZ.notes) { const f = hz(midi(n)); voice(f, t, Math.max(0.5, b * spb * 1.6), "sine", 0.22, 6000); voice(f * 2, t, 0.25, "sine", 0.05, 8000); t += b * spb; }
+  const total = t - nextT;
+  for (let k = 0, s = nextT; s < nextT + total; s += spb, k++) { const src = ac.createBufferSource(), fl = ac.createBiquadFilter(), g = ac.createGain(); src.buffer = noiseBuf; fl.type = "bandpass"; fl.frequency.value = k % 2 ? 2600 : 3400; fl.Q.value = 10; g.gain.setValueAtTime(0.12, s); g.gain.exponentialRampToValueAtTime(0.0001, s + 0.04); src.connect(fl); fl.connect(g); g.connect(bgmBus); src.start(s); src.stop(s + 0.05); }
+  ["A2", "F2", "D2", "E2"].forEach((n, i) => voice(hz(midi(n)), nextT + i * total / 4, total / 4, "triangle", 0.22, 700));
+  nextT += total + spb;
+}
 function scheduleSong() {
   if (track === "award") return scheduleAward();
+  if (track === "quiz") return scheduleQuiz();
   const song = SONGS[songIx % SONGS.length]; songIx++;
   const spb = 60 / song.bpm; let t = nextT;
   // 멜로디(사각파) + 한 옥타브 위 반짝 종소리 살짝

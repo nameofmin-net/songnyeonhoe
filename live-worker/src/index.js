@@ -53,7 +53,8 @@ export class Room extends DurableObject {
     this.lastChat = new Map();
     this.show = null;
     this.mode = null;
-    ctx.blockConcurrencyWhile(async () => { this.show = (await ctx.storage.get("show")) || null; this.mode = (await ctx.storage.get("mode")) || null; });
+    this.quizQs = []; this.quiz = null; this.votes = new Map();
+    ctx.blockConcurrencyWhile(async () => { this.show = (await ctx.storage.get("show")) || null; this.mode = (await ctx.storage.get("mode")) || null; this.quizQs = (await ctx.storage.get("quizQs")) || []; this.quiz = (await ctx.storage.get("quiz")) || null; });
   }
   menus() {
     return this.ctx.storage.sql.exec("SELECT sid, name, title, sub, people, at, extra FROM menus ORDER BY sid").toArray().map(({ extra, ...m }) => ({ kind: "merit", ...JSON.parse(extra || "{}"), ...m, people: JSON.parse(m.people || "[]") }));
@@ -81,6 +82,7 @@ export class Room extends DurableObject {
       server.send(JSON.stringify({ type: "chatlog", items: this.chatlog() }));
       server.send(JSON.stringify({ type: "show", show: this.show }));
       server.send(JSON.stringify({ type: "mode", mode: this.mode }));
+      server.send(JSON.stringify({ type: "quiz", quiz: this.quiz, votes: Object.fromEntries(this.votes) }));
       return new Response(null, { status: 101, webSocket: client });
     }
     if (path === "/api/state" && req.method === "GET") return json(req, { attendees: this.list() });
@@ -147,10 +149,37 @@ export class Room extends DurableObject {
       return json(req, { ok: true });
     }
     // ---------- 어드민 컨트롤러: 시상 메뉴 만들기 · 재생 ----------
-    if (path.startsWith("/api/menu") || path === "/api/show" || path === "/api/mode") {
+    // OX 퀴즈 투표(입장한 사람만, 문제가 열려 있을 때만)
+    if (path === "/api/quiz/vote") {
+      const id = Number(body.id), pick = body.pick === "O" || body.pick === "X" ? body.pick : null;
+      if (!pick || !this.quiz || this.quiz.phase !== "ask") return json(req, { error: "closed" }, 409);
+      if (!this.ctx.storage.sql.exec("SELECT id FROM att WHERE id = ?", id).toArray().length) return json(req, { error: "not joined" }, 403);
+      if (this.votes.get(id) === pick) return json(req, { ok: true });
+      this.votes.set(id, pick);
+      this.broadcast({ type: "vote", id, pick, idx: this.quiz.idx });
+      return json(req, { ok: true });
+    }
+    if (path.startsWith("/api/menu") || path === "/api/show" || path === "/api/mode" || path.startsWith("/api/quiz")) {
       if (!this.admin(req)) return json(req, { error: "forbidden" }, 403);
       const txt = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
-      if (path === "/api/menus") return json(req, { ok: true, menus: this.menus(), show: this.show, mode: this.mode });
+      if (path === "/api/menus") return json(req, { ok: true, menus: this.menus(), show: this.show, mode: this.mode, quizQs: this.quizQs, quiz: this.quiz, votes: Object.fromEntries(this.votes) });
+      if (path === "/api/quiz/save") {
+        this.quizQs = (Array.isArray(body.questions) ? body.questions : []).slice(0, 50).map((q) => ({ q: txt(q.q, 80), a: q.a === "X" ? "X" : "O" })).filter((q) => q.q);
+        await this.ctx.storage.put("quizQs", this.quizQs);
+        return json(req, { ok: true, quizQs: this.quizQs });
+      }
+      if (path === "/api/quiz/ctl") {
+        const act = String(body.action || ""), n = this.quizQs.length;
+        const ask = (idx) => { this.votes = new Map(); this.quiz = { on: true, idx, total: n, phase: "ask", q: this.quizQs[idx].q, at: Date.now() }; };
+        if (act === "start") { if (!n) return json(req, { error: "no questions" }, 400); ask(0); }
+        else if (act === "reveal" && this.quiz) { const qq = this.quizQs[this.quiz.idx]; const c = { O: 0, X: 0 }; for (const v of this.votes.values()) c[v]++; this.quiz = { ...this.quiz, phase: "reveal", a: qq ? qq.a : "O", counts: c }; }
+        else if (act === "next" && this.quiz) { if (this.quiz.idx + 1 >= n) this.quiz = { ...this.quiz, phase: "end" }; else ask(this.quiz.idx + 1); }
+        else if (act === "goto" && this.quiz) { const i = Number(body.idx); if (i >= 0 && i < n) ask(i); }
+        else if (act === "stop") { this.quiz = null; this.votes = new Map(); }
+        await this.ctx.storage.put("quiz", this.quiz);
+        this.broadcast({ type: "quiz", quiz: this.quiz, votes: Object.fromEntries(this.votes) });
+        return json(req, { ok: true, quiz: this.quiz });
+      }
       // 기본 메뉴: 시상식 준비 모드(모두 앉아서 단상을 봄)
       if (path === "/api/mode") {
         this.mode = body.mode === "ceremony" ? "ceremony" : null;

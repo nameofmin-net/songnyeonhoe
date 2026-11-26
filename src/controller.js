@@ -92,6 +92,7 @@ export function mountController({ entries }) {
   const el = document.createElement("div");
   el.className = "ctl"; el.hidden = true;
   document.body.appendChild(el);
+  let quizQs = [], quiz = null, votes = {}, qdraft = null;
   let menus = [], show = null, mode = null, view = "list", draft = null, query = "", sortMode = "here", busy = false, msg = "";
 
   const call = async (path, body) => {
@@ -110,13 +111,14 @@ export function mountController({ entries }) {
   async function open() {
     if (!(await ensureKey())) return;
     el.hidden = false; view = "list"; msg = "불러오는 중…"; render();
-    try { const r = await call("/api/menus"); menus = r.menus; show = r.show; mode = r.mode; msg = ""; render(); } catch { /* 위에서 처리 */ }
+    try { const r = await call("/api/menus"); menus = r.menus; show = r.show; mode = r.mode; quizQs = r.quizQs || []; quiz = r.quiz; votes = r.votes || {}; msg = ""; render(); } catch { /* 위에서 처리 */ }
   }
   const close = () => (el.hidden = true);
 
   function render() {
     if (el.hidden) return;
     if (view === "edit") return renderEdit();
+    if (view === "quiz") return renderQuiz();
     const m = show && menus.find((x) => x.sid === show.sid);
     el.innerHTML = `
       <div class="ctl-head"><b>🎮 컨트롤러</b><button data-a="close">닫기 ✕</button></div>
@@ -127,6 +129,11 @@ export function mountController({ entries }) {
           <p>트리가 사라지고 모두 광장 바닥에 줄 맞춰 앉아 단상을 봐요. 최근화 대표님은 단상으로 올라가요.${mode === "ceremony" ? "<br><b>● 지금 준비 모드 중</b>" : ""}</p>
           <div class="row">${mode === "ceremony" ? `<button class="big red" data-a="modeoff" ${busy ? "disabled" : ""}>■ 준비 모드 끝내기</button>` : `<button class="big" data-a="modeon" ${busy ? "disabled" : ""}>▶ 시작</button>`}</div>
         </div>
+        <div class="card base ${quiz ? "live" : ""}">
+          <h4>⭕❌ OX 퀴즈 <small>기본 메뉴</small></h4>
+          <p>광장이 운동장으로 바뀌고 모두 츄리닝 차림이 돼요. 휴대폰엔 문제와 O·X 버튼이 떠요.<br>문제 ${quizQs.length}개${quiz ? `<br><b>● 진행 중 — ${quiz.phase === "end" ? "모든 문제 끝" : `${quiz.idx + 1}번 문제 ${quiz.phase === "ask" ? "투표 중" : "정답 공개"}`}</b>` : ""}</p>
+          ${quiz ? quizRemoteHTML() : `<div class="row"><button class="ghost" data-a="qedit">문제 설정</button><button class="big" data-a="qstart" ${busy || !quizQs.length ? "disabled" : ""}>▶ 시작</button></div>`}
+        </div>
         <button class="big" data-a="new">＋ 새 메뉴 만들기</button>
         ${menus.length ? menus.map((x) => `
           <div class="card">
@@ -136,6 +143,24 @@ export function mountController({ entries }) {
               : `${esc(x.title)}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.prizeOn && x.prize ? ` · 상금 ${esc(x.prize)}` : ""}<br>수상자 ${x.people.length}명${x.people.length ? ` — ${x.people.slice(0, 6).map((id) => esc(ALL[id]?.name)).join(", ")}${x.people.length > 6 ? " 외" : ""}` : ""}`}</p>
             <div class="row"><button class="big play" data-a="play" data-sid="${x.sid}" ${busy ? "disabled" : ""}>▶ 재생</button><button class="ghost" data-a="edit" data-sid="${x.sid}">수정</button><button class="ghost" data-a="del" data-sid="${x.sid}">삭제</button></div>
           </div>`).join("") : `<div class="empty">아직 메뉴가 없어요.<br>위의 '새 메뉴 만들기'로 첫 시상을 만들어 보세요.</div>`}
+        <div class="msg">${esc(msg)}</div>
+      </div>`;
+  }
+  function quizRemoteHTML() {
+    const c = { O: 0, X: 0 }; Object.values(votes).forEach((v) => c[v]++);
+    const q = quizQs[quiz.idx];
+    return `<p style="color:#fff;font-size:14px">Q${quiz.idx + 1}/${quizQs.length}. ${esc(quiz.q)}<br><span style="color:#9a90b0">정답 ${q ? q.a : "?"} · 지금 ⭕ ${c.O}명 / ❌ ${c.X}명</span></p>
+      ${quiz.phase === "ask" ? `<button class="big next" data-a="qreveal" ${busy ? "disabled" : ""}>정답 공개</button>` : quiz.phase === "reveal" ? `<button class="big next" data-a="qnext" ${busy ? "disabled" : ""}>${quiz.idx + 1 < quizQs.length ? "다음 문제 ▶" : "마무리 ▶"}</button>` : ""}
+      <div class="row"><button class="big red" data-a="qstop" ${busy ? "disabled" : ""}>■ 퀴즈 끝내기 (광장으로)</button></div>`;
+  }
+  function renderQuiz() {
+    el.innerHTML = `
+      <div class="ctl-head"><b>OX 퀴즈 문제</b><button data-a="back">취소</button></div>
+      <div class="ctl-body">
+        ${qdraft.map((q, i) => `<div class="card"><label class="f">Q${i + 1}<textarea data-q="${i}" maxlength="80" placeholder="예) 우리 회사 창립일은 3월이다">${esc(q.q)}</textarea></label>
+          <div class="row"><div class="seg" style="flex:2"><button data-a="qans" data-i="${i}" data-v="O" class="${q.a === "O" ? "on" : ""}">정답 ⭕</button><button data-a="qans" data-i="${i}" data-v="X" class="${q.a === "X" ? "on" : ""}">정답 ❌</button></div><button class="ghost" data-a="qdel" data-i="${i}">삭제</button></div></div>`).join("")}
+        <button class="ghost" data-a="qadd">＋ 문제 추가</button>
+        <button class="big" data-a="qsave" ${busy ? "disabled" : ""}>저장</button>
         <div class="msg">${esc(msg)}</div>
       </div>`;
   }
@@ -209,6 +234,7 @@ export function mountController({ entries }) {
 
   // 입력값은 렌더 없이 draft에 반영(키보드가 닫히지 않게)
   el.addEventListener("input", (e) => {
+    if (e.target.dataset.q !== undefined && qdraft) { qdraft[+e.target.dataset.q].q = e.target.value; return; }
     const f = e.target.dataset.f; if (!f || !draft) return;
     if (f === "q") { query = e.target.value.trim(); refreshList(); el.querySelector(".plist").scrollTop = 0; return; }
     if (f === "prizeOn") { draft.prizeOn = e.target.checked; const t = el.querySelector("[data-f=prize]"); t.disabled = !draft.prizeOn; if (draft.prizeOn) t.focus(); return; }
@@ -229,6 +255,25 @@ export function mountController({ entries }) {
     if (a === "new") { draft = { sid: 0, kind: "merit", name: "", title: "", sub: "", people: [], prizeOn: false, prize: "", award: "", desc: "", quote: "", winner: -1, rivals: [] }; query = ""; msg = ""; view = "edit"; return render(); }
     if (a === "edit") { const m = menus.find((x) => x.sid === sid); draft = { ...{ sid: 0, kind: "merit", name: "", title: "", sub: "", people: [], prizeOn: false, prize: "", award: "", desc: "", quote: "", winner: -1, rivals: [] }, ...m, people: [...m.people], rivals: [...(m.rivals || [])] }; query = ""; msg = ""; view = "edit"; return render(); }
     if (a === "back") { view = "list"; msg = ""; return render(); }
+    if (a === "qedit") { qdraft = quizQs.length ? quizQs.map((q) => ({ ...q })) : [{ q: "", a: "O" }]; msg = ""; view = "quiz"; return render(); }
+    if (a === "qadd") { qdraft.push({ q: "", a: "O" }); renderQuiz(); el.querySelector(".ctl-body").scrollTop = 1e6; return; }
+    if (a === "qdel") { qdraft.splice(+b.dataset.i, 1); const sc = el.querySelector(".ctl-body").scrollTop; renderQuiz(); el.querySelector(".ctl-body").scrollTop = sc; return; }
+    if (a === "qans") { qdraft[+b.dataset.i].a = b.dataset.v; b.parentElement.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); return; }
+    if (a === "qsave") {
+      busy = true; msg = "저장 중…"; renderQuiz();
+      try { const r = await call("/api/quiz/save", { questions: qdraft }); quizQs = r.quizQs; view = "list"; msg = `문제 ${quizQs.length}개 저장했어요 ✓`; } catch (err) { msg = err.message === "forbidden" ? "" : "저장에 실패했어요."; }
+      busy = false; return render();
+    }
+    const qctl = async (action) => {
+      if (action === "stop" && !confirm("퀴즈를 끝내고 광장으로 돌아갈까요?")) return;
+      busy = true; render();
+      try { const r = await call("/api/quiz/ctl", { action }); quiz = r.quiz; if (action !== "reveal") votes = {}; msg = ""; } catch (err) { msg = err.message === "forbidden" ? "" : "광장에 보내지 못했어요."; }
+      setTimeout(() => { busy = false; render(); }, 900); render();
+    };
+    if (a === "qstart") return qctl("start");
+    if (a === "qreveal") return qctl("reveal");
+    if (a === "qnext") return qctl("next");
+    if (a === "qstop") return qctl("stop");
     if (a === "kind") { draft.kind = b.dataset.v; return renderEdit(); }
     if (a === "award") {
       const [k, n, p, d] = UPL_AWARDS.find((x) => x[0] === b.dataset.v);
@@ -292,5 +337,7 @@ export function mountController({ entries }) {
     /** 서버에서 무대 상태가 바뀌면(다른 기기 포함) 리모컨에 반영 */
     onShow(sh) { show = sh; if (!el.hidden && view === "list") render(); },
     onMode(m) { mode = m; if (!el.hidden && view === "list") render(); },
+    onQuiz(q, v) { quiz = q; votes = v || {}; if (!el.hidden && view === "list") render(); },
+    onVote(m) { votes[m.id] = m.pick; if (!el.hidden && view === "list" && !busy) render(); },
   };
 }

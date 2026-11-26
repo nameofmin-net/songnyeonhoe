@@ -12,6 +12,15 @@
   body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 8px 12px; overflow: hidden; }
   .row { display: flex; gap: 12px; align-items: stretch; justify-content: center; max-width: 100%; }
   #stage { position: relative; flex: none; box-shadow: 0 0 0 3px #1c1624, 0 0 0 6px var(--line), 0 20px 60px #000a; }
+  /* OX 퀴즈 문제 띠 */
+  #quizBar { position: absolute; left: 2cqw; top: 2.5cqh; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: .6cqh; padding: 1.2cqh 3cqw; background: #f6ead0; color: #1c1624; border: .4cqw solid #1c1624; box-shadow: 0 .6cqh 0 #1c1624; max-width: 34cqw; text-align: center; pointer-events: none; }
+  #quizBar[hidden] { display: none; }
+  #quizBar small { font-size: 1.5cqw; color: #c8327a; letter-spacing: .1em; }
+  #quizBar b { font-size: 2.6cqw; line-height: 1.35; word-break: keep-all; }
+  #quizBar span { font-size: 1.5cqw; color: #6a5a4a; }
+  #quizBar .ans { font-style: normal; font-size: 3.6cqw; font-weight: bold; animation: callPop .5s cubic-bezier(.22,1,.36,1); }
+  #quizBar .ans.o { color: #2f6ad8; } #quizBar .ans.x { color: #d83a3a; }
+  @keyframes callPop { from { transform: scale(1.6); opacity: 0; } to { transform: none; opacity: 1; } }
   /* 시상식 무대: 빨간 커튼 */
   #stage { container-type: size; }
   #show { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
@@ -186,6 +195,7 @@
     <div id="stage">
       <canvas id="world"></canvas><canvas id="overlay"></canvas>
       <div id="announce"></div>
+      <div id="quizBar" hidden></div>
       <div id="show"><div class="sh-back"></div><div class="sh-card"></div><div class="sh-conf"></div><canvas class="curtain"></canvas><div class="valance"></div></div>
     </div>
     <div class="col right">

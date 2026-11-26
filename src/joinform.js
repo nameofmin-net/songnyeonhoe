@@ -44,6 +44,7 @@ export const ADMIN_NAME = "최민우";
 export const ADMIN_ID = ALL.findIndex((d) => d.name === ADMIN_NAME);
 const ADMIN_LS = "songnyeonhoe-admin";
 export const adminKey = { get: () => { try { return localStorage.getItem(ADMIN_LS) || ""; } catch { return ""; } }, set: (k) => { try { k ? localStorage.setItem(ADMIN_LS, k) : localStorage.removeItem(ADMIN_LS); } catch {} } };
+export const sendQuizVote = (id, pick) => post("/api/quiz/vote", { id, pick });
 export const adminPost = (path, body) => post(path, body, { "X-Admin-Key": adminKey.get() });
 
 /**
@@ -67,6 +68,8 @@ export function connectLive(h) {
       else if (m.type === "emote") h.emote?.(m);
       else if (m.type === "show") h.show?.(m.show);
       else if (m.type === "mode") h.mode?.(m.mode);
+      else if (m.type === "quiz") h.quiz?.(m.quiz, m.votes || {});
+      else if (m.type === "vote") h.vote?.(m);
     };
     ws.onclose = () => { clearInterval(ping); h.status?.(false); setTimeout(open, wait); wait = Math.min(wait * 2, 15000); };
     ws.onerror = () => { try { ws.close(); } catch {} };
@@ -179,6 +182,17 @@ const CSS = `
 .mob-head .who b { font-size: 17px; display: block; } .mob-head .who b.M { color: #a8d4ff; } .mob-head .who b.F { color: #ffc2dc; }
 .mob-head .who small { font-size: 11px; color: #9a90b0; }
 .mob-head .btn { padding: 8px 12px; font-size: 13px; }
+.mob-quiz { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 20px 16px; text-align: center; background: #e8d6b0; color: #3a2a1a; }
+.mob.quizzing .mob-chat, .mob.quizzing .mob-in { display: none; }
+.qz-n { font-size: 14px; color: #c8327a; letter-spacing: .1em; }
+.qz-q { font-size: 22px; line-height: 1.5; word-break: keep-all; color: #1c1624; }
+.qz-btns { display: flex; gap: 16px; width: 100%; }
+.qz-btns button { flex: 1; aspect-ratio: 1; font: inherit; font-size: 72px; line-height: 1; border: 4px solid #1c1624; box-shadow: 0 6px 0 #1c1624; cursor: pointer; color: #fff; }
+.qz-btns .o { background: #2f6ad8; } .qz-btns .x { background: #d83a3a; }
+.qz-btns button.on { transform: translateY(4px); box-shadow: 0 2px 0 #1c1624; outline: 4px solid #ffd84a; }
+.qz-btns button:disabled { opacity: .35; } .qz-btns button.ans { opacity: 1; outline: 5px solid #5ae08a; }
+.qz-st { font-size: 15px; min-height: 1.4em; } .qz-st .ok { color: #1a8a3a; font-size: 20px; } .qz-st .ng { color: #c81e2a; font-size: 20px; }
+.qz-end { font-size: 22px; line-height: 1.6; } .qz-end small { font-size: 14px; color: #6a5a4a; }
 .mob-head .btn.ctl-btn { padding: 6px 10px; font-size: 20px; }
 .mob-chat { flex: 1; overflow-y: auto; padding: 8px 10px; list-style: none; margin: 0; }
 .mob-chat .empty { color: #7a7090; text-align: center; padding: 40px 10px; font-size: 13px; line-height: 1.6; }
@@ -235,9 +249,10 @@ const PW = 40, PH = 46;
 export function mountEntry(root, { lock = true, entries, onEntered, onController }) {
   if (!cssOn) { const s = document.createElement("style"); s.textContent = CSS; document.head.append(s); cssOn = true; }
   let view = null, me = null, timer = null, chatItems = [], renderChat = null;
+  let quizState = null, myPick = {}, renderQuiz = null;
 
   function showForm(note = "") {
-    view = "form"; me = null; clearInterval(timer); renderChat = null;
+    view = "form"; me = null; clearInterval(timer); renderChat = null; renderQuiz = null;
     document.body.classList.remove("chatting");
     root.innerHTML = `
       <form class="jf" autocomplete="off">
@@ -335,6 +350,7 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
             ${id === ADMIN_ID && onController ? `<button class="btn ctl-btn" data-act="ctl">🎮</button>` : ""}
             <button class="btn sub" data-act="edit">캐릭터 수정</button>
           </header>
+          <div class="mob-quiz" hidden></div>
           <ul class="mob-chat"></ul>
           <div class="mob-emo">${EMOTES.map(([k, e, l]) => `<button type="button" data-emo="${k}"><i>${e}</i>${l}</button>`).join("")}</div>
           <form class="mob-in" autocomplete="off"><input maxlength="100" placeholder="광장에 메시지 보내기" enterkeyhint="send"><button class="btn">전송</button></form>
@@ -348,6 +364,26 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
         renderChat.first = false;
       };
       renderChat.first = true; renderChat();
+      // OX 퀴즈: 진행 중엔 채팅 대신 문제 + O/X 버튼(이모티콘은 그대로)
+      const qbox = root.querySelector(".mob-quiz"), mob = root.querySelector(".mob");
+      renderQuiz = () => {
+        const q = quizState;
+        mob.classList.toggle("quizzing", !!q);
+        qbox.hidden = !q;
+        if (!q) return;
+        if (q.phase === "end") { qbox.innerHTML = `<div class="qz-end">🏁 모든 문제가 끝났어요!<br><small>광장 화면을 봐 주세요</small></div>`; return; }
+        const pick = myPick[q.idx], rev = q.phase === "reveal";
+        const res = rev ? (pick ? (pick === q.a ? `<b class="ok">⭕ 정답! 살아남았어요 🎉</b>` : `<b class="ng">탈락… 💀</b>`) : `<b class="ng">투표 안 했어요</b>`) : pick ? `${pick} 쪽으로 이동했어요` : "O 또는 X를 골라 주세요";
+        qbox.innerHTML = `<div class="qz-n">Q${q.idx + 1}${q.total ? ` / ${q.total}` : ""}</div><div class="qz-q">${esc(q.q)}</div>
+          <div class="qz-btns"><button data-pick="O" class="o ${pick === "O" ? "on" : ""} ${rev && q.a === "O" ? "ans" : ""}" ${rev ? "disabled" : ""}>O</button><button data-pick="X" class="x ${pick === "X" ? "on" : ""} ${rev && q.a === "X" ? "ans" : ""}" ${rev ? "disabled" : ""}>X</button></div>
+          <div class="qz-st">${res}</div>`;
+      };
+      qbox.addEventListener("click", async (e) => {
+        const b = e.target.closest("[data-pick]"); if (!b || !quizState || quizState.phase !== "ask") return;
+        const prev = myPick[quizState.idx]; myPick[quizState.idx] = b.dataset.pick; renderQuiz();
+        try { await sendQuizVote(id, b.dataset.pick); } catch (err) { myPick[quizState.idx] = prev; renderQuiz(); if (err.message === "closed") alert("투표가 마감됐어요"); }
+      });
+      renderQuiz();
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
         const text = input.value.trim(); if (!text) return;
@@ -473,5 +509,6 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
     chatlog: (items) => { chatItems = items.slice(-150); renderChat?.(); },
     chat: (m) => { chatItems.push(m); if (chatItems.length > 150) chatItems.shift(); renderChat?.(); },
     emote: (m) => { chatItems.push(m); if (chatItems.length > 150) chatItems.shift(); renderChat?.(); },
+    quiz: (q, votes) => { quizState = q && q.on ? q : null; if (q && me !== null && votes && votes[me]) myPick[q.idx] = votes[me]; renderQuiz?.(); },
   };
 }
