@@ -4,7 +4,7 @@ import { createFrame, painterFor, hex } from "../pixelfx/core/index.js";
 const C = hex;
 const h2 = (x, y) => { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 export const WALL = 118; // 담장 아래 끝(여기부터 운동장)
-export const O_ZONE = { x: 170, y: 252, r: 78 }, X_ZONE = { x: 470, y: 252, r: 78 };
+export const O_ZONE = { x: 122, y: 252, r: 70 }, X_ZONE = { x: 358, y: 252, r: 70 };
 
 export function buildQuizBg(W, H) {
   const f = createFrame(W, H), p = painterFor(f);

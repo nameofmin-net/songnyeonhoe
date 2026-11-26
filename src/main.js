@@ -17,7 +17,7 @@ import { buildQuizBg, drawDoll, WALL, O_ZONE, X_ZONE } from "./quiz.js";
 import { sfx, setSound, soundOn, savedPref, setTrack } from "./audio.js";
 import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf, chatItemHTML } from "./joinform.js";
 
-const W = 640, H = 360;
+const W = 480, H = 360;
 const CX = W / 2, FY = 216; // 광장 중심(대형 트리)
 const params = new URLSearchParams(location.search);
 // 휴대폰에서는 광장 대신 입장(채팅) 페이지로
@@ -33,10 +33,10 @@ cv.width = W; cv.height = H;
 const img = ctx.createImageData(W, H);
 let S = 3, dpr = 1;
 function resize() {
-  const wide = innerWidth >= 1100, side = wide ? 236 + 300 + 24 : 0;
+  const wide = innerWidth >= 1000, side = wide ? 236 + 300 + 24 : 0;
   document.body.classList.toggle("narrow", !wide);
-  const avail = Math.min((innerWidth - 24 - side) / W, ((wide ? innerHeight : innerHeight * 0.62) - 96) / H);
-  S = Math.max(1, avail >= 2 ? Math.floor(avail) : avail);
+  const avail = Math.min((innerWidth - 24 - side) / W, ((wide ? innerHeight : innerHeight * 0.62) - 20) / H);
+  S = Math.max(1, avail);
   const cw = Math.round(W * S), ch = Math.round(H * S);
   for (const c of [cv, ov]) { c.style.width = cw + "px"; c.style.height = ch + "px"; }
   stage.style.width = cw + "px"; stage.style.height = ch + "px";
@@ -157,9 +157,9 @@ function addProp(spr, x, y, block, glow) {
   }
 }
 function buildProps() {
-  for (const [x, y] of [[130, 140], [510, 140], [130, 312], [510, 312]]) addProp(lampSpr, x, y, [x - 4, y - 3, x + 4, y + 2], [x, y - 38, 46, "#ffcf80", 0.45]);
+  for (const [x, y] of [[CX - 190, 140], [CX + 190, 140], [CX - 190, 312], [CX + 190, 312]]) addProp(lampSpr, x, y, [x - 4, y - 3, x + 4, y + 2], [x, y - 38, 46, "#ffcf80", 0.45]);
   for (const [x, y] of [[CX - 150, 82], [CX + 150, 82], [56, 200], [W - 56, 200]]) addProp(benchSpr, x, y, [x - 20, y - 6, x + 20, y + 2]);
-  for (const [x, y] of [[36, 100], [W - 36, 100], [CX - 210, 340], [CX + 210, 340]]) addProp(treeSpr, x, y, [x - 14, y - 6, x + 14, y + 3]);
+  for (const [x, y] of [[36, 100], [W - 36, 100], [CX - 175, 344], [CX + 175, 344]]) addProp(treeSpr, x, y, [x - 14, y - 6, x + 14, y + 3]);
   for (const [x, y] of [[CX - 110, 262], [CX + 110, 262], [CX - 88, 108], [CX + 88, 108], [CX, 336]]) addProp(potSpr, x, y, [x - 8, y - 4, x + 8, y + 2]);
   // 12시 방향 단상
   addProp(podium, CX, 104, [CX - 76, 44, CX + 76, 108], [CX, 70, 60, "#fff0c0", 0.25]);
@@ -905,7 +905,7 @@ $("#joinBtn").addEventListener("click", openModal);
 const sndBtn = $("#sound");
 const paintSnd = () => (sndBtn.textContent = soundOn() ? "🔊 소리 끄기" : "🔇 캐롤·효과음 켜기");
 sndBtn.addEventListener("click", async () => { await setSound(!soundOn()); paintSnd(); });
-if (savedPref()) addEventListener("pointerdown", async function first(e) { removeEventListener("pointerdown", first); if (e.target !== sndBtn && !soundOn()) { await setSound(true); paintSnd(); } });
+addEventListener("pointerdown", async function first(e) { removeEventListener("pointerdown", first); if (e.target !== sndBtn && !soundOn()) { await setSound(true); paintSnd(); } });
 paintSnd();
 modal.addEventListener("pointerdown", (e) => { if (e.target === modal) closeModal(); });
 $("#modalClose").addEventListener("click", closeModal);

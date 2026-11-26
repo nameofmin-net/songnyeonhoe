@@ -111,6 +111,7 @@
   @keyframes boom { 0%,100% { transform: none; } 10% { transform: translate(-8px, 4px); } 25% { transform: translate(7px, -5px); } 40% { transform: translate(-5px, 3px); } 60% { transform: translate(3px, -2px); } 80% { transform: translate(-1px, 1px); } }
   #stage canvas { position: absolute; inset: 0; image-rendering: pixelated; image-rendering: crisp-edges; }
   #overlay { cursor: pointer; }
+  .bar[hidden], .hint[hidden] { display: none !important; }
 
   /* 좌우 명단 */
   .col { flex: none; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
@@ -208,14 +209,14 @@
       </section>
     </div>
   </div>
-  <div class="bar">
+  <div class="bar" hidden>
     <button id="joinBtn">✋ 입장하기</button>
     <button id="rand5">🎲 랜덤 5명 입장</button>
     <button id="cheers">🥂 다 같이 건배</button>
     <button id="sound">🔇 캐롤·효과음 켜기</button>
     <button id="reset">↺ 초기화</button>
   </div>
-  <div class="hint"><span id="live">○ 연결 중…</span> · 캐릭터를 클릭하면 반응해요 · 휴대폰에서 <a href="join.html" target="_blank">입장 페이지</a>로 들어와도 돼요 · pixel effects by pixelfx (MIT)</div>
+  <div class="hint" hidden><span id="live">○ 연결 중…</span> · 캐릭터를 클릭하면 반응해요 · 휴대폰에서 <a href="join.html" target="_blank">입장 페이지</a>로 들어와도 돼요 · pixel effects by pixelfx (MIT)</div>
   <div id="modal"><div class="sheet"><button id="modalClose" aria-label="닫기">✕</button><div id="modalBody"></div></div></div>
   <script type="module">/*BUNDLE*/</script>
 </body>
