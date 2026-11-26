@@ -8,7 +8,9 @@ const h2 = (x, y) => { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h 
 // 3x5 픽셀 글자
 const GLYPH = {
   U: ["101", "101", "101", "101", "111"], P: ["111", "101", "111", "100", "100"], L: ["100", "100", "100", "100", "111"],
-  E: ["111", "100", "111", "100", "111"], A: ["010", "101", "111", "101", "101"], T: ["111", "010", "010", "010", "010"],
+  E: ["111", "100", "111", "100", "111"], A: ["010", "101", "111", "101", "101"], T: ["111", "010", "010", "010", "010"], W: ["101", "101", "101", "111", "101"], H: ["101", "101", "111", "101", "101"],
+  R: ["110", "101", "110", "101", "101"], I: ["111", "010", "010", "010", "111"], N: ["101", "111", "111", "111", "101"], D: ["110", "101", "101", "101", "110"],
+  B: ["110", "101", "110", "101", "110"], G: ["111", "100", "101", "101", "111"], S: ["111", "100", "111", "001", "111"], " ": ["000", "000", "000", "000", "000"],
 };
 function text(p, s, x, y, c, k = 1) {
   for (const ch of s) {
@@ -20,58 +22,63 @@ function text(p, s, x, y, c, k = 1) {
 
 export function buildOfficeBg(W, H, CX, FY, FLOOR_TOP, lamps) {
   const f = createFrame(W, H), p = painterFor(f);
-  // 벽: 웜그레이 + 세로 우드 슬랫
-  p.rect(0, 0, W, FLOOR_TOP, C("#cfc6b8"));
-  for (let x = 0; x < W; x += 4) p.rect(x, 0, 2, FLOOR_TOP - 4, C(x % 8 ? "#a8805a" : "#b48c64"));
-  // 야경 통창(양옆으로 반복)
-  for (let x = 14; x < W - 30; x += 62) {
-    if (x > CX - 140 && x < CX + 40) continue;
-    p.rect(x - 2, 4, 46, 30, C("#2b2a30"));
-    p.rect(x, 6, 42, 26, C("#1b1f36"));
-    for (let i = 0; i < 6; i++) { // 빌딩 실루엣 + 불 켜진 창
-      const bx = x + i * 7, bh = 8 + Math.floor(h2(x + i, 3) * 14);
-      p.rect(bx, 32 - bh, 6, bh, C("#2a2f4a"));
-      for (let yy = 32 - bh + 2; yy < 31; yy += 3) for (let xx = bx + 1; xx < bx + 5; xx += 2) if (h2(xx, yy) < 0.45) p.rect(xx, yy, 1, 1, C("#ffd98a"));
-    }
-    p.rect(x + 20, 6, 2, 26, C("#2b2a30")); // 창틀
-    p.rect(x, 6, 42, 1, C("#3a3f5e"));
+  const BLUE = C("#1e4fd6"), BLUE2 = C("#1a43b8"), INK = C("#1c1c22");
+  // 벽: 흰 벽 + 천장 라인 조명
+  p.rect(0, 0, W, FLOOR_TOP, C("#ecebe7"));
+  p.rect(0, 0, W, 2, C("#ffffff"));
+  // 왼쪽: 대형 LED 스크린(가을 공원)
+  const lx = 8, lw = Math.min(110, Math.round(W * 0.22));
+  p.rect(lx - 2, 3, lw + 4, 36, INK);
+  for (let y = 0; y < 32; y++) for (let x = 0; x < lw; x++) {
+    let c = y < 14 ? (y < 6 ? "#6aa8e8" : "#8cc0f0") : y < 24 ? (h2(x >> 1, y >> 1) < 0.5 ? "#c8742e" : h2(x, y) < 0.5 ? "#a85a22" : "#e0a040") : "#b0a070";
+    if (y < 16 && x > 8 && x < 22 && y > 3 + ((x * 7) % 5)) c = "#b85a48"; // 건물
+    if (y < 16 && x > 70 && x < 78 && y > 5 - (x % 3)) c = "#c86a50";
+    f.color[(5 + y) * W + lx + x] = C(c);
   }
-  // 가운데: 유리 출입문 + 위쪽 UPLEAT 사인
-  p.rect(CX - 20, 4, 40, FLOOR_TOP - 4, C("#2b2a30"));
-  p.rect(CX - 18, 12, 36, FLOOR_TOP - 12, C("#c8d6cc"));
-  p.rect(CX - 1, 12, 2, FLOOR_TOP - 12, C("#2b2a30"));
-  p.rect(CX - 6, 26, 1, 6, C("#e8e8e8")); p.rect(CX + 5, 26, 1, 6, C("#e8e8e8")); // 손잡이
-  for (let i = 0; i < 5; i++) p.rect(CX - 16 + i * 7, 14 + i, 3, 1, C("#ffffff")); // 유리 반사
-  // 벽면 UPLEAT 사인(도어 왼쪽, 전구줄 아래)
-  const sx = CX - 84;
-  p.rect(sx - 30, 13, 60, 18, C("#1c1624"));
-  text(p, "UPLEAT", sx - 23, 17, C("#ffffff"), 2);
-  p.glow(sx, 22, 30, C("#ffffff"), 0.2);
-  p.glow(CX, 28, 32, C("#ffe2b0"), 0.28);
+  p.glow(lx + lw / 2, 20, 50, C("#ffe0b0"), 0.25);
+  // 유리 파티션(검은 프레임) — 스크린 오른쪽부터 끝까지
+  const gx0 = lx + lw + 8;
+  p.rect(gx0, 4, W - gx0, FLOOR_TOP - 8, C("#dfe6e6"));
+  for (let x = gx0; x < W; x++) if (h2(x, 2) < 0.3) p.rect(x, 6, 1, FLOOR_TOP - 12, C("#e8eeee"));
+  for (let x = gx0; x < W; x += 34) p.rect(x, 4, 2, FLOOR_TOP - 8, INK);
+  p.rect(gx0, 4, W - gx0, 1, INK);
+  // 파티션 너머 사무실(모니터·의자 실루엣)
+  for (let x = gx0 + 6; x < W - 10; x += 22) { if (Math.abs(x - CX) < 30) continue; p.rect(x, 22, 8, 5, C("#3a3f4a")); p.rect(x + 1, 23, 6, 3, C("#7ab0e0")); p.rect(x - 2, 28, 14, 2, C("#f4f4f2")); p.rect(x + 2, 30, 5, 5, C("#c8c8c8")); }
+  // 오른쪽 유리에 세로 스트라이프 시트 + "WHERE THE WIND BEGINS"
+  const sx0 = W - 96;
+  for (let x = sx0; x < W - 4; x += 4) p.rect(x, 5, 2, FLOOR_TOP - 10, C("#ffffff"));
+  p.rect(W - 44, 12, 40, 24, C("#f6f8f8"));
+  text(p, "WHERE", W - 26, 14, INK); text(p, "THE WIND", W - 38, 21, INK); text(p, "BEGINS", W - 30, 28, INK);
+  // 가운데 출입문(유리 양문)
+  p.rect(CX - 18, 8, 36, FLOOR_TOP - 8, C("#cfdada"));
+  p.rect(CX - 18, 8, 36, 1, INK); p.rect(CX - 18, 8, 1, FLOOR_TOP - 8, INK); p.rect(CX + 17, 8, 1, FLOOR_TOP - 8, INK); p.rect(CX, 8, 1, FLOOR_TOP - 8, INK);
+  p.rect(CX - 4, 22, 1, 7, INK); p.rect(CX + 3, 22, 1, 7, INK);
+  // 흰 기둥 + 파란 U 로고 (문 왼쪽)
+  const ux = CX - 62;
+  p.rect(ux - 12, 0, 24, FLOOR_TOP - 2, C("#f8f8f6")); p.rect(ux + 10, 0, 2, FLOOR_TOP - 2, C("#d8d8d4"));
+  p.rect(ux - 5, 8, 3, 12, BLUE); p.rect(ux + 2, 8, 3, 12, BLUE); p.rect(ux - 5, 18, 10, 3, BLUE); p.rect(ux - 6, 8, 5, 1, BLUE); p.rect(ux + 1, 8, 5, 1, BLUE);
+  text(p, "UPLEAT", ux - 11, 25, BLUE);
   // 걸레받이
-  p.rect(0, FLOOR_TOP - 4, W, 4, C("#3a3230")); p.rect(0, FLOOR_TOP - 4, W, 1, C("#5a4c46"));
-  // 바닥: 오크 원목(엇갈린 판재)
+  p.rect(0, FLOOR_TOP - 4, W, 4, C("#c8c6c0")); p.rect(0, FLOOR_TOP - 4, W, 1, C("#ffffff"));
+  // 바닥: 밝은 폴리싱 콘크리트 + 트리 아래 코발트 블루 러그
   for (let y = FLOOR_TOP; y < H; y++) for (let x = 0; x < W; x++) {
-    const row = Math.floor((y - FLOOR_TOP) / 7), off = (row * 23) % 48, gx = (x + off) % 48, gy = (y - FLOOR_TOP) % 7;
-    const plank = Math.floor((x + off) / 48) * 7 + row, tone = h2(plank, 1);
-    let c = tone < 0.33 ? "#c49a6a" : tone < 0.66 ? "#b98e5e" : "#cfa676";
-    if (gy === 6 || gx === 0) c = "#8a6440";
-    else if (h2(x, y) < 0.05) c = "#a87e50";
-    else if (gy === 0) c = "#d8b282";
-    // 트리 아래 둥근 러그(버건디 + 금색 테)
-    const dx = x - CX, dy = (y - FY) * 1.9, d = Math.hypot(dx, dy);
-    if (d < 108) c = d > 101 ? "#d8a83a" : d > 97 ? "#6a1e2a" : (Math.floor(d / 6) % 2 ? "#7c2632" : "#842a36");
+    const n = h2(x >> 2, y >> 2), m = h2(x, y);
+    let c = n < 0.25 ? "#d2d1cc" : n < 0.7 ? "#d9d8d3" : "#dfded9";
+    if (m < 0.04) c = "#c6c4be"; else if (m > 0.985) c = "#ecebe7";
+    if ((y - FLOOR_TOP) % 60 === 59 || x % 80 === 0) c = "#cbc9c3"; // 줄눈
+    const dx = Math.abs(x - CX), dy = Math.abs(y - FY - 8);
+    const rr = (dx / 88) ** 4 + (dy / 34) ** 4;
+    if (rr < 1) c = rr > 0.8 ? "#1a43b8" : h2(x, y) < 0.08 ? "#2a5ae0" : "#1e4fd6";
     f.color[y * W + x] = C(c);
   }
-  // 아래 양 모서리: 화단 대신 원목 플랜터 + 초록
+  // 아래 양 모서리: 흰 플랜터 + 초록
   for (const sx of [1, -1]) for (let y = H - 60; y < H; y++) for (let x = 0; x < 70; x++) {
     const px = sx > 0 ? x : W - 1 - x, k = x + (H - y) * 1.1;
     if (k > 92) continue;
-    f.color[y * W + px] = C(k > 88 ? "#6a4a30" : k > 84 ? "#8a6440" : h2(px, y) < 0.15 ? "#5aa866" : (x + y) % 5 === 0 ? "#2f6a44" : "#3f8a55");
+    f.color[y * W + px] = C(k > 88 ? "#b8b6b0" : k > 84 ? "#f4f4f2" : h2(px, y) < 0.15 ? "#6cbf5a" : (x + y) % 5 === 0 ? "#2f7a44" : "#45994f");
   }
-  // 천장 펜던트 조명 느낌의 따뜻한 빛 웅덩이
-  for (const [x, y] of lamps) p.glow(x, y - 30, 50, C("#ffd9a0"), 0.4);
-  p.glow(CX, FY - 40, 120, C("#fff0d0"), 0.12);
+  for (const [x, y] of lamps) p.glow(x, y - 30, 40, C("#fff6e0"), 0.15);
+  p.glow(CX, FY - 40, 140, C("#ffffff"), 0.06);
   const bg = new Uint32Array(W * H), light = new Uint32Array(W * H);
   for (let i = 0; i < W * H; i++) { bg[i] = f.color[i]; light[i] = f.light[i]; }
   return { bg, light };
@@ -82,32 +89,30 @@ function spr(w, h, ox, oy, draw) {
   p.place(ox, oy); draw(p);
   return { w, h, ox, oy, color: f.color, light: f.light };
 }
-// 가로등 → 아크 플로어 램프
+// 가로등 → 흰 돔 펜던트 스탠드
 export const officeLamp = spr(24, 46, 12, 45, (p) => {
-  p.rect(-4, -2, 8, 2, C("#2b2a30"));
-  p.rect(-1, -30, 2, 28, C("#3a3a40")); p.rect(-1, -30, 1, 28, C("#5a5a62"));
-  for (let i = 0; i < 8; i++) p.rect(-1 + i, -31 - Math.round(Math.sin(i / 8 * Math.PI) * 6), 2, 2, C("#3a3a40"));
-  p.rect(4, -36, 10, 4, C("#f4ead8")); p.rect(5, -32, 8, 1, C("#fff6da"));
+  p.rect(-4, -2, 8, 2, C("#1c1c22"));
+  p.rect(0, -34, 1, 32, C("#1c1c22"));
+  p.rect(-6, -38, 13, 3, C("#f4f4f2")); p.rect(-4, -40, 9, 2, C("#ffffff")); p.rect(-6, -35, 13, 1, C("#c8c8c4"));
+  p.rect(-2, -34, 5, 1, C("#fff6da"));
 });
-// 벤치 → 패브릭 소파
+// 벤치 → 그레이 모듈 소파 + 오렌지 쿠션
 export const officeSofa = spr(40, 18, 20, 16, (p) => {
-  p.rect(-18, -15, 36, 8, C("#4a5568")); p.rect(-18, -15, 36, 1, C("#6a7588"));
-  p.rect(-19, -8, 38, 6, C("#55607a")); p.rect(-19, -8, 38, 1, C("#7a86a0"));
-  p.rect(-20, -12, 3, 10, C("#3f4a5c")); p.rect(17, -12, 3, 10, C("#3f4a5c"));
-  p.rect(-10, -13, 8, 5, C("#e8b44a")); p.rect(3, -13, 8, 5, C("#d9d2c4")); // 쿠션
-  p.rect(-17, -2, 2, 2, C("#2a2230")); p.rect(15, -2, 2, 2, C("#2a2230"));
+  p.rect(-18, -15, 36, 8, C("#9a9a9e")); p.rect(-18, -15, 36, 1, C("#b8b8bc"));
+  p.rect(-19, -8, 38, 6, C("#a8a8ac")); p.rect(-19, -8, 38, 1, C("#c8c8cc"));
+  p.rect(-20, -13, 3, 11, C("#8a8a8e")); p.rect(17, -13, 3, 11, C("#8a8a8e"));
+  p.rect(-12, -13, 8, 6, C("#e0642a")); p.rect(-12, -13, 8, 1, C("#f08a4a"));
+  p.rect(4, -13, 8, 6, C("#c8332f")); p.rect(4, -13, 8, 1, C("#e0504a"));
+  p.rect(-17, -2, 1, 2, C("#c8c8cc")); p.rect(16, -2, 1, 2, C("#c8c8cc"));
 });
-// 작은 트리 → 큰 화분(몬스테라)
+// 작은 트리 → 큰 관엽 화분(검은 화분)
 export const officePlant = spr(40, 58, 20, 56, (p) => {
-  p.rect(-7, -12, 14, 12, C("#ece6dc")); p.rect(-8, -13, 16, 2, C("#ffffff")); p.rect(5, -12, 2, 12, C("#cfc6b8"));
-  const L = [[-10, -24, 7], [8, -26, 7], [-4, -34, 8], [6, -40, 7], [-9, -42, 6], [1, -48, 6], [-2, -20, 6]];
-  for (const [x, y, r] of L) { p.circle(x, y, r, C("#2f7a4a")); p.circle(x - 1, y - 1, r - 2, C("#3f9a5a")); p.rect(x, y - r + 2, 1, r * 2 - 3, C("#24603a")); }
-  p.rect(-1, -30, 2, 18, C("#2a5a34"));
+  p.rect(-7, -12, 14, 12, C("#2a2a30")); p.rect(-8, -13, 16, 2, C("#3a3a42"));
+  p.rect(-1, -36, 2, 24, C("#6a4a30"));
+  const L = [[-9, -26, 6], [8, -28, 6], [-5, -36, 7], [6, -42, 6], [-10, -42, 5], [1, -50, 6], [-2, -22, 5], [10, -36, 5]];
+  for (const [x, y, r] of L) { p.circle(x, y, r, C("#3f8a3a")); p.circle(x - 1, y - 1, r - 2, C("#5aaa4a")); }
 });
-// 화분 → 카페 테이블 + 커피잔
+// 화분 → 코발트 블루 큐브 오토만
 export const officeTable = spr(20, 26, 10, 25, (p) => {
-  p.rect(-1, -9, 2, 8, C("#3a3a40")); p.rect(-5, -2, 10, 2, C("#3a3a40"));
-  p.rect(-8, -12, 16, 3, C("#f4efe6")); p.rect(-8, -10, 16, 1, C("#cfc6b8"));
-  p.rect(-5, -16, 3, 4, C("#ffffff")); p.rect(-2, -15, 1, 2, C("#ffffff")); p.rect(-5, -16, 3, 1, C("#6a3a2a"));
-  p.rect(2, -15, 4, 3, C("#e8b44a")); p.rect(2, -16, 4, 1, C("#5a3a2a"));
+  p.rect(-6, -10, 12, 10, C("#1e4fd6")); p.rect(-6, -10, 12, 2, C("#3a6ae8")); p.rect(4, -8, 2, 8, C("#1a3fa8"));
 });
