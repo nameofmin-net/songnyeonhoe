@@ -1116,13 +1116,34 @@ const COIN_URL = (() => {
   frames.forEach((rows, f) => rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === ".") return; g.fillStyle = { O, D, M, L }[ch]; g.fillRect(f * 10 + x, y, 1, 1); })));
   return c.toDataURL();
 })();
-// 상금이 나올 때 동전이 팡 튄다
+// 상금이 나올 때 동전이 분수처럼 솟았다가 중력으로 떨어져 바닥에서 통통 튄다
 function coinBurst(el) {
   if (!el) return;
   showEl.style.setProperty("--coin", `url(${COIN_URL})`);
-  const box = document.createElement("div"); box.className = "coins";
-  box.innerHTML = Array.from({ length: 26 }, (_, i) => { const an = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, sp = 9 + Math.random() * 14; return `<i style="--x:${(Math.cos(an) * sp).toFixed(1)}cqw;--y:${(Math.sin(an) * sp * 1.6).toFixed(1)}cqh;--r:${Math.round(Math.random() * 720 - 360)}deg;animation-delay:${(i * 0.012).toFixed(3)}s"></i>`; }).join("");
-  el.appendChild(box); sfx.coins(); setTimeout(() => box.remove(), 1800);
+  const host = showEl, hr = host.getBoundingClientRect(), er = el.getBoundingClientRect();
+  const ox = er.left + er.width / 2 - hr.left, oy = er.top - hr.top, floor = hr.height * 0.96, U = hr.width / 100; // U = 1cqw
+  const box = document.createElement("div"); box.className = "coins"; host.appendChild(box);
+  const coins = []; let spawned = 0, last = performance.now(), t = 0;
+  const N = 34, G = 95 * U;
+  sfx.coins();
+  const tick = (ms) => {
+    const dt = Math.min(0.033, (ms - last) / 1000); last = ms; t += dt;
+    // 0.55초 동안 줄줄이 뿜어 올림
+    while (spawned < N && spawned < (t / 0.55) * N) {
+      const i = document.createElement("i"); box.appendChild(i);
+      coins.push({ el: i, x: ox + (Math.random() - 0.5) * 2 * U, y: oy, vx: (Math.random() - 0.5) * 70 * U, vy: -(58 + Math.random() * 30) * U, life: 0, b: 0 });
+      spawned++;
+      if (spawned % 8 === 0) sfx.coins();
+    }
+    for (const c of coins) {
+      c.life += dt; c.vy += G * dt; c.x += c.vx * dt; c.y += c.vy * dt;
+      if (c.y > floor && c.vy > 0) { c.y = floor; c.vy *= -0.42; c.vx *= 0.7; c.b++; }
+      const a = c.life > 2.2 ? Math.max(0, 1 - (c.life - 2.2) / 0.5) : 1;
+      c.el.style.transform = `translate(${c.x.toFixed(1)}px, ${c.y.toFixed(1)}px)`; c.el.style.opacity = a;
+    }
+    if (t < 3) requestAnimationFrame(tick); else box.remove();
+  };
+  requestAnimationFrame(tick);
 }
 function drawSpr(cv, id, dir, step, cache) {
   const img = spriteImage(styleOf(id), dir, step, cache);
