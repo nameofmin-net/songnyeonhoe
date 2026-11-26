@@ -16,7 +16,7 @@ export const UPL_AWARDS = [
 ];
 
 const CSS = `
-.ctl { position: fixed; inset: 0; z-index: 20; background: #110d18; color: #f4eefc; font-family: Galmuri11, "Apple SD Gothic Neo", sans-serif; display: flex; flex-direction: column; }
+.ctl { position: fixed; inset: 0; z-index: 20; background: #110d18; color: #f4eefc; font-family: Galmuri14, "Apple SD Gothic Neo", sans-serif; display: flex; flex-direction: column; }
 .ctl[hidden] { display: none; }
 .ctl-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: #2a1830; border-bottom: 2px solid #5a3050; flex: none; }
 .ctl-head b { flex: 1; font-size: 17px; color: #ffd84a; }

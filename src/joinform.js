@@ -108,7 +108,7 @@ export function chatItemHTML(m, meId = null) {
 
 // ---------- 화면 ----------
 const CSS = `
-.jf { display: flex; flex-direction: column; gap: 14px; font-family: Galmuri11, "Apple SD Gothic Neo", sans-serif; color: #f4eefc; }
+.jf { display: flex; flex-direction: column; gap: 14px; font-family: Galmuri14, "Apple SD Gothic Neo", sans-serif; color: #f4eefc; }
 .jf-head { display: flex; align-items: center; gap: 14px; }
 .jf-av { width: 72px; height: 112px; flex: none; display: grid; place-items: center; background: #1c1630; border: 2px solid #4a3f6a; }
 .jf-av img { width: 54px; height: 84px; image-rendering: pixelated; }
@@ -172,7 +172,7 @@ const CSS = `
 .ce .M { color: #a8d4ff; } .ce .F { color: #ffc2dc; }
 .ce.mine { justify-content: flex-end; }
 /* 모바일: 입장 후 채팅 화면 */
-.mob { height: 100dvh; display: flex; flex-direction: column; font-family: Galmuri11, "Apple SD Gothic Neo", sans-serif; color: #f4eefc; }
+.mob { height: 100dvh; display: flex; flex-direction: column; font-family: Galmuri14, "Apple SD Gothic Neo", sans-serif; color: #f4eefc; }
 .mob-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #1a1426; border-bottom: 2px solid #3a2f52; flex: none; }
 .mob-head img { width: 36px; height: 56px; image-rendering: pixelated; }
 .mob-head .who { flex: 1; min-width: 0; }

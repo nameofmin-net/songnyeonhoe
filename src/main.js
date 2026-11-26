@@ -507,7 +507,7 @@ function drawOverlay() {
   // 현수막
   {
     const cx = CX * S, cy = 30 * S;
-    c.font = `bold ${big}px Galmuri11, "Apple SD Gothic Neo", sans-serif`;
+    c.font = `bold ${big}px Galmuri14, "Apple SD Gothic Neo", sans-serif`;
     const t = "🎉 2026 U PLEAT 송년회 🎉", tw = c.measureText(t).width + 24;
     pixelBox(c, cx - tw / 2, cy - big * 0.9, tw, big * 1.8, u * 2, "#b8332f", "#1c1624");
     c.fillStyle = "#ffe08a"; c.fillText(t, cx, cy + 1);
@@ -515,7 +515,7 @@ function drawOverlay() {
 
   const list = [...people].sort((a, b) => a.y - b.y);
   // 이름표
-  c.font = `${nameF}px Galmuri11, "Apple SD Gothic Neo", sans-serif`;
+  c.font = `${nameF}px Galmuri14, "Apple SD Gothic Neo", sans-serif`;
   for (const r of list) {
     if (r.hidden || r.state === "ride" || r.state === "sit") continue;
     const x = r.x * S, y = (r.y + 3) * S + nameF * 0.6;
@@ -526,7 +526,7 @@ function drawOverlay() {
     c.fillText(r.name, x, y + 1);
   }
   // 말풍선
-  c.font = `${talkF}px Galmuri11, "Apple SD Gothic Neo", sans-serif`;
+  c.font = `${talkF}px Galmuri14, "Apple SD Gothic Neo", sans-serif`;
   for (const r of list) {
     if (!r.speech) continue;
     const x = r.x * S, top = (r.y - SH - 4 - (r.state === "ride" ? r.lift + 2 : 0)) * S - (r.icon ? 14 * S : 0) - (r.beering ? 18 * S : 0);
