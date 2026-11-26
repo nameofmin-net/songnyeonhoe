@@ -621,7 +621,7 @@ function renderLists(highlight) {
     `<li><img src="${avatarURL(id, 2, true)}" alt=""><span class="nm ${ALL[id].style.gender}">${ALL[id].name}</span></li>`).join("");
   $("#presList").innerHTML = pres.length ? pres.map(([id, v]) =>
     `<li class="${id === highlight ? "new" : ""}"><img src="${avatarURL(id, 2, true)}" alt=""><div><span class="nm ${ALL[id].style.gender}">${ALL[id].name}</span><p>${esc(v.message)}</p></div></li>`).join("")
-    : `<li class="empty">아직 아무도 없어요.<br>첫 번째로 입장해 보세요!</li>`;
+    : `<li class="empty">아직 아무도 없어요.<br>${officeOn ? "첫 번째로 출근해 보세요!" : "첫 번째로 입장해 보세요!"}</li>`;
   if (highlight >= 0) $("#presList").scrollTop = 0; // 방금 온 사람이 보이게
   form?.sync();
 }
@@ -901,7 +901,11 @@ function toggleOffice() {
   if (!officeScene) officeScene = buildOfficeBg(W, H, CX, FY, FLOOR_TOP, props.filter((p) => p.spr === lampSpr).map((p) => [p.x, p.y]));
   sfx.enter?.();
   cv.animate([{ filter: "brightness(1)" }, { filter: "brightness(0)", offset: 0.45 }, { filter: "brightness(0)", offset: 0.55 }, { filter: "brightness(1)" }], { duration: 700, easing: "ease-in-out" });
-  setTimeout(() => { officeOn = !officeOn; }, 340);
+  setTimeout(() => {
+    officeOn = !officeOn;
+    $("#presT").textContent = officeOn ? "출근한 사람" : "송년회 참석 중";
+    $("#waitT").textContent = officeOn ? "아직 출근 전" : "아직 도착 전";
+  }, 340);
 }
 ov.addEventListener("dblclick", (e) => {
   const rect = ov.getBoundingClientRect(), x = (e.clientX - rect.left) / S, y = (e.clientY - rect.top) / S;
