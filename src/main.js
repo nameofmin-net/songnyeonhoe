@@ -1078,7 +1078,8 @@ async function startSpotlight(sh) {
   cone.style.opacity = 1;
   // 원뿔 조명이 줄 위를 부드럽게 좌우로 훑다가 점점 느려지며 수상자에서 멈춘다
   const xs = els.map((e) => pos(e)[0]), lo = Math.min(...xs) - 10, hi = Math.max(...xs) + 10, mid = (lo + hi) / 2, amp = (hi - lo) / 2;
-  const wx = xs[winIx], T = 12000;
+  const wx = xs[winIx], T = 14000;
+  els.forEach((e) => (e.style.transition = "none"));
   cone.style.transition = "none";
   await new Promise((done) => {
     const t0 = performance.now(); let ph = Math.random() * 6.28, lastT = t0;
@@ -1086,12 +1087,12 @@ async function startSpotlight(sh) {
     const step = (ms) => {
       if (!showCur || showCur.step !== 2) return done();
       const u = Math.min(1, (ms - t0) / T), dt = (ms - lastT) / 1000; lastT = ms;
-      ph += dt * (1.3 - 1.0 * u); // 점점 느려짐
+      ph += dt * (1.0 - 0.75 * u); // 천천히, 갈수록 더 느려짐
       const sweep = mid + amp * Math.sin(ph), k = sm(0.72, 1, u);
       const cxNow = sweep * (1 - k) + wx * k;
       cone.style.transform = `translateX(${cxNow.toFixed(1)}px)`;
       // 빛 안에 들어온 사람만 밝게(빛의 폭에 따라 부드럽게)
-      els.forEach((e, i) => { const l = Math.max(0, 1 - Math.abs(xs[i] - cxNow) / (cone.offsetWidth * 0.42)); e.style.filter = `brightness(${(0.28 + 0.95 * l).toFixed(2)})`; });
+      els.forEach((e, i) => { const l = Math.max(0, 1 - Math.abs(xs[i] - cxNow) / (cone.offsetWidth * 0.5)); e.style.filter = `brightness(${(0.25 + 1.15 * Math.min(1, l * 1.4)).toFixed(2)})`; });
       if (u < 1) requestAnimationFrame(step); else setTimeout(done, 700);
     };
     requestAnimationFrame(step);
@@ -1099,7 +1100,9 @@ async function startSpotlight(sh) {
   if (!showCur || showCur.step !== 2) return;
   // 쾅! 수상자만 남기
   sfx.fanfare(); panel.classList.add("hit");
-  els.forEach((e, i) => { e.style.filter = ""; if (i !== winIx) e.classList.add("lose"); else e.classList.add("win", "lit"); });
+  // 최종 포커스: 빛이 좁아지며 수상자만 환하게
+  cone.style.transition = "transform .6s cubic-bezier(.22,1,.36,1)"; cone.style.transform = `translateX(${wx}px) scaleX(.72)`;
+  els.forEach((e, i) => { e.style.transition = "opacity .8s, filter .6s"; if (i !== winIx) { e.style.filter = "brightness(.15)"; e.classList.add("lose"); } else { e.style.filter = "brightness(1.35)"; e.classList.add("win", "lit"); } });
   await wait(1500);
   revealWinner(sh);
 }
