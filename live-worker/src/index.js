@@ -176,7 +176,7 @@ export class Room extends DurableObject {
       this.broadcast({ type: "vote", id, pick, idx: this.quiz.idx });
       return json(req, { ok: true });
     }
-    if (path.startsWith("/api/menu") || path === "/api/show" || path === "/api/mode" || path === "/api/office" || path === "/api/reload" || path.startsWith("/api/quiz")) {
+    if (path.startsWith("/api/menu") || path === "/api/show" || path === "/api/mode" || path === "/api/office" || path === "/api/reload" || path === "/api/music" || path.startsWith("/api/quiz")) {
       if (!this.admin(req)) return json(req, { error: "forbidden" }, 403);
       const txt = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
       if (path === "/api/menus") return json(req, { ok: true, menus: this.menus(), show: this.show, mode: this.mode, quizQs: this.quizQs, quiz: this.quiz, votes: Object.fromEntries(this.votes) });
@@ -205,6 +205,7 @@ export class Room extends DurableObject {
         this.broadcast({ type: "office", on: this.office });
         return json(req, { ok: true, on: this.office });
       }
+      if (path === "/api/music") { this.broadcast({ type: "music", play: !!body.play }); return json(req, { ok: true }); }
       if (path === "/api/reload") { this.broadcast({ type: "reload" }); return json(req, { ok: true }); }
       // 기본 메뉴: 시상식 준비 모드(모두 앉아서 단상을 봄)
       if (path === "/api/mode") {
