@@ -942,17 +942,18 @@ const OFFICE_LINES = {
   sofa: { hi: ["아 푹신하다~", "여기 명당이네요", "잠깐 쉬었다 갈게요 😌", "이 소파 진짜 편해"], mid: ["쿠션 색 예쁘다", "5분만 눈 붙일까…", "여기서 회의해도 되겠다", "올해 진짜 바빴죠?"], bye: ["자, 다시 일하러!", "충전 완료 💪"] },
   bar: { hi: ["간식 뭐 있어요?", "여기 앉아도 되죠?", "오늘 저녁 뭐 먹지?"], mid: ["과자 하나만 먹을게요 🍪", "이 테이블 원목 좋다", "내년 워크숍 어디 가요?", "수다 타임 ☕"], bye: ["잘 먹었습니다!", "이제 들어가 볼게요"] },
   coffee: { hi: ["커피 한 잔 하실 분? ☕", "아아 수혈 중…", "샷 추가 필수"], mid: ["원두 바뀌었나?", "커피 없인 못 살아"], bye: ["카페인 충전 완료!"] },
+  desk: { hi: ["메일만 확인하고 갈게요 📧", "PPT 마무리 중…", "잠깐 일 좀 할게요", "야근은 없다!"], mid: ["Ctrl+S 습관…", "피그마 또 멈췄다 😇", "내년 제안서 벌써?", "이거 다음 주 마감이죠?", "모니터 하나 더 있었으면"], bye: ["퇴근각! 🏃", "저장 완료!", "오늘은 여기까지"] },
   water: { hi: ["물 마시러 왔어요 💧", "정수기 물 시원하다"], mid: ["하루 2리터 목표"], bye: ["수분 보충 끝!"] },
 };
 // 사옥 모드: 몇 초마다 한 명씩 소파·바 테이블·커피머신으로 가서 앉거나 머문다
 setInterval(() => {
   if (!officeOn || ceremony?.on || quizVis) return;
   const used = people.filter((p) => p.seat?.office);
-  if (used.length >= Math.min(OFFICE.seats.length, Math.ceil(people.length * 0.4))) return;
+  if (used.length >= Math.min(OFFICE.seats.length, Math.ceil(people.length * 0.5))) return;
   const free = OFFICE.seats.filter((q) => !used.some((p) => p.seat.x === q.x && p.seat.y === q.y));
   const cand = people.filter((p) => !p.seat && !p.d.npc && p.entering === undefined && (p.state === "walk" || p.state === "idle"));
   if (!free.length || !cand.length) return;
-  const r = choose(cand), q = choose(free), inK = q.kind !== "sofa";
+  const r = choose(cand), q = choose(free), inK = q.kind === "bar" || q.kind === "coffee" || q.kind === "water";
   const outside = r.x > OFFICE.K.x1 || r.y < OFFICE.K.y0;
   r.seat = { ...q, office: true, stand: !!q.stand, stay: rnd(9, 20), via: inK && outside ? [{ ...OFFICE.doorOut }, { ...OFFICE.doorIn }] : undefined };
   r.timer = 0;
