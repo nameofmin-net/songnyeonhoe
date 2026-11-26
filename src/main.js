@@ -13,7 +13,7 @@ import * as beer from "./beer.js";
 import * as transform from "./transform.js";
 import { drawSpecial, floatOf } from "./special.js";
 import { createCurtain } from "./curtain.js";
-import { sfx, setSound, soundOn, savedPref } from "./audio.js";
+import { sfx, setSound, soundOn, savedPref, setTrack } from "./audio.js";
 import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf, chatItemHTML } from "./joinform.js";
 
 const W = 640, H = 360;
@@ -1133,7 +1133,7 @@ async function doUpl(sh, isNew) {
   if (sh.step === 2 && prev !== 3) startSpotlight(sh);
   if (sh.step === 3) { if (!showCard.querySelector(".up-2.done")) revealWinner(sh); sfx.fanfare(); sfx.applause(3); confettiRain(); }
 }
-function applyShow(sh) { showChain = showChain.then(() => doShow(sh)).catch(() => {}); }
+function applyShow(sh) { setTrack(sh ? "award" : "carol"); showChain = showChain.then(() => doShow(sh)).catch(() => {}); }
 
 // ---------- 기본 메뉴: 시상식 준비 모드 ----------
 const CEO_NAME = "최근화";

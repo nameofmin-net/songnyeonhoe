@@ -159,7 +159,33 @@ function voice(f, s, dur, type, vol, cut) {
   o.connect(g); g.connect(fl); fl.connect(bgmBus); o.start(s); o.stop(s + dur);
   queue.push(o); if (queue.length > 400) queue.splice(0, 200);
 }
+// 시상식 BGM: 직접 만든 웅장한 행진풍 루프(C장조, 느린 템포) — 패드 화음 + 금관 멜로디 + 팀파니
+let track = "carol";
+export function setTrack(t) {
+  if (t === track) return; track = t;
+  if (!ac || !enabled) return;
+  // 지금 큐를 페이드아웃하고 새 트랙으로
+  const g = bgmBus.gain, now = ac.currentTime;
+  g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0.0001, now + 0.6);
+  setTimeout(() => { stopBgm(); g.cancelScheduledValues(ac.currentTime); g.setValueAtTime(0.16, ac.currentTime); startBgm(); }, 650);
+}
+const AWARD = { bpm: 84, chords: [["C3", "E3", "G3"], ["A2", "E3", "A3"], ["F2", "C3", "A3"], ["G2", "D3", "B3"], ["C3", "E3", "G3"], ["F2", "A3", "C4"], ["D3", "F3", "A3"], ["G2", "D3", "G3"]],
+  mel: "G4 1.5 C5 .5 E5 2 D5 1 C5 1 A4 2 C5 1 A4 1 F4 1.5 A4 .5 C5 2 B4 2 G4 1.5 C5 .5 E5 2 G5 1 F5 1 A4 2 D5 1 F5 1 E5 1.5 D5 .5 C5 4" };
+AWARD.notes = parse(AWARD.mel);
+function scheduleAward() {
+  const spb = 60 / AWARD.bpm, bar = 4 * spb; let t = nextT;
+  AWARD.chords.forEach((ch, i) => {
+    const s = nextT + i * bar;
+    for (const n of ch) { voice(hz(midi(n)), s, bar * 0.98, "sawtooth", 0.07, 900); voice(hz(midi(n)) * 2, s, bar * 0.98, "triangle", 0.05, 2000); }
+    voice(hz(midi(ch[0]) - 12), s, bar * 0.95, "triangle", 0.3, 600);
+    // 팀파니
+    for (const k of [0, 2.5, 3]) { const ts = s + k * spb; tone(bgmBus, { f: hz(midi(ch[0]) - 12), f2: hz(midi(ch[0]) - 14), t: ts - ac.currentTime, dur: 0.5, vol: k ? 0.18 : 0.3 }); }
+  });
+  for (const [n, b] of AWARD.notes) { if (n !== "R") { const f = hz(midi(n)); voice(f, t, b * spb, "sawtooth", 0.11, 2200); voice(f / 2, t, b * spb, "square", 0.04, 1500); } t += b * spb; }
+  nextT += AWARD.chords.length * bar;
+}
 function scheduleSong() {
+  if (track === "award") return scheduleAward();
   const song = SONGS[songIx % SONGS.length]; songIx++;
   const spb = 60 / song.bpm; let t = nextT;
   // 멜로디(사각파) + 한 옥타브 위 반짝 종소리 살짝
