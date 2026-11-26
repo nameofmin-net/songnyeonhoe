@@ -27,7 +27,7 @@ export function officeLayout(W, H) {
   const K = { x1: Math.round(W * 0.45), y0: Math.round(H * 0.69), bx0: Math.round(W * 0.06), bx1: Math.round(W * 0.33), by0: Math.round(H * 0.82) };
   const tree = { x: Math.round(W * 0.82), y: Math.round(H * 0.57) };
   // 못 들어가는 곳: 소파 두 조각, 라운지 테이블, 탕비실 전체
-  const blocks = [[L.sx0, L.sy0 - 2, L.sx1, L.sy0 + 12], [L.sx1 - 12, L.sy0, L.sx1, L.sy1], [L.tx0 + 20, L.ty0 + 52, L.tx0 + 40, L.ty0 + 66], [0, K.y0 - 4, K.x1 + 2, H]];
+  const blocks = [[L.sx0, L.sy0 - 2, L.sx1, L.sy0 + 17], [L.sx1 - 17, L.sy0, L.sx1, L.sy1], [L.tx0 + 20, L.ty0 + 52, L.tx0 + 40, L.ty0 + 66], [0, K.y0 - 4, K.x1 + 2, H]];
   return { L, K, tree, blocks };
 }
 export function buildOfficeBg(W, H, CX, FY, FLOOR_TOP) {
@@ -78,25 +78,58 @@ export function buildOfficeBg(W, H, CX, FY, FLOOR_TOP) {
     if (m < 0.04) c = "#c6c4be"; else if (m > 0.985) c = "#ecebe7";
     if ((y - FLOOR_TOP) % 60 === 59 || x % 80 === 0) c = "#cbc9c3"; // 줄눈
     // 파란 타일 라운지(ㄱ자 소파 자리)
-    if (x >= L.tx0 && x < L.tx1 && y >= L.ty0 && y < L.ty1) c = ((x >> 3) + (y >> 3)) % 2 ? "#1e4fd6" : "#2456dc";
+    if (x >= L.tx0 && x < L.tx1 && y >= L.ty0 && y < L.ty1) c = h2(x, y) < 0.12 ? "#2a5ae0" : h2(x >> 1, y) < 0.2 ? "#1a46c4" : "#1e4fd6";
     if ((x === L.tx0 || x === L.tx1 - 1 || y === L.ty0 || y === L.ty1 - 1) && x >= L.tx0 && x < L.tx1 && y >= L.ty0 && y < L.ty1) c = "#1a3fa8";
     f.color[y * W + x] = C(c);
   }
-  // ㄱ자 소파(그레이 + 오렌지·레드 쿠션)
-  const sofa = (x, y, w, h) => { p.rect(x, y, w, h, C("#8e8e94")); p.rect(x + 1, y + 1, w - 2, h - 3, C("#a8a8ae")); p.rect(x + 1, y + 1, w - 2, 1, C("#c4c4ca")); p.rect(x, y + h - 1, w, 1, C("#6a6a70")); };
-  sofa(L.sx0, L.sy0, L.sx1 - L.sx0, 12);
-  sofa(L.sx1 - 12, L.sy0, 12, L.sy1 - L.sy0);
-  p.rect(L.sx0 + 8, L.sy0 + 3, 9, 6, C("#e0642a")); p.rect(L.sx0 + 22, L.sy0 + 3, 9, 6, C("#c8332f"));
-  p.rect(L.sx1 - 10, L.sy0 + 30, 8, 9, C("#e0642a"));
-  // 라운지 원형 테이블 + 블루 큐브
-  p.circle(L.tx0 + 30, L.ty0 + 60, 9, C("#2a2a30")); p.circle(L.tx0 + 30, L.ty0 + 59, 8, C("#f4f4f2"));
-  p.rect(L.tx0 + 10, L.ty1 - 26, 12, 11, C("#3a6ae8")); p.rect(L.tx0 + 10, L.ty1 - 16, 12, 1, C("#1a3fa8"));
-  // 탕비실: 위쪽 벽+카운터, 오른쪽 파티션, 긴 원목 바 테이블 + 검은 스툴
-  p.rect(0, K.y0, K.x1, 5, C("#2a2a30")); p.rect(0, K.y0 + 5, K.x1 - 20, 9, C("#f4f4f2")); p.rect(0, K.y0 + 13, K.x1 - 20, 1, C("#c8c8c4"));
-  for (let x = 8; x < K.x1 - 30; x += 22) p.rect(x, K.y0 + 6, 8, 5, C(x % 44 ? "#1c1c22" : "#c8c8cc")); // 커피머신·전자레인지
-  p.rect(K.x1 - 4, K.y0, 5, H - K.y0, C("#2a2a30")); p.rect(K.x1 - 3, K.y0, 1, H - K.y0, C("#5a5a62"));
-  p.rect(K.bx0, K.by0, K.bx1 - K.bx0, 10, C("#d8a860")); p.rect(K.bx0, K.by0, K.bx1 - K.bx0, 2, C("#f0c880")); p.rect(K.bx0, K.by0 + 9, K.bx1 - K.bx0, 1, C("#8a6440"));
-  for (let i = 0; i < 4; i++) { const sx = K.bx0 + 10 + i * Math.round((K.bx1 - K.bx0 - 20) / 3.2); for (const sy of [K.by0 - 9, K.by0 + 14]) { p.circle(sx, sy, 3.5, C("#1c1c22")); p.rect(sx - 1, sy - 2, 2, 1, C("#4a4a52")); } }
+  // ㄱ자 소파: 라이트 그레이 펠트 + 크롬 다리, 쿠션(네이비·핑크·오렌지)
+  const GR = C("#b9bcbc"), GR2 = C("#a4a8a8"), GRL = C("#d2d5d4"), GRD = C("#8a8e8e"), CHROME = C("#e8eaee");
+  const sofa = (x, y, w, h, backTop) => {
+    p.rect(x, y, w, h, GR); p.rect(x, y, w, 1, GRL); p.rect(x, y + h - 1, w, 1, GRD);
+    if (backTop) { p.rect(x, y, w, 4, GR2); p.rect(x, y, w, 1, GRL); } else { p.rect(x + w - 4, y, 4, h, GR2); p.rect(x + w - 1, y, 1, h, GRD); }
+    for (const [lx, ly] of [[x + 1, y + h], [x + w - 2, y + h]]) p.rect(lx, ly, 1, 2, CHROME);
+  };
+  sofa(L.sx0, L.sy0, L.sx1 - L.sx0 - 16, 17, true);
+  sofa(L.sx1 - 17, L.sy0, 17, L.sy1 - L.sy0, false);
+  const cush = (x, y, w, h, c, hl) => { p.rect(x, y, w, h, C(c)); p.rect(x, y, w, 1, C(hl)); p.rect(x + w - 1, y + 1, 1, h - 1, C("#00000022")); };
+  cush(L.sx0 + 3, L.sy0 + 5, 9, 8, "#25356a", "#3a4c88");
+  cush(L.sx0 + 15, L.sy0 + 5, 9, 8, "#e8c8c8", "#f8e0e0");
+  cush(L.sx0 + 28, L.sy0 + 5, 10, 8, "#c86a2a", "#e08a44");
+  cush(L.sx1 - 14, L.sy0 + 24, 8, 10, "#2a4aa0", "#4060c0");
+  cush(L.sx1 - 14, L.sy0 + 40, 8, 9, "#3a8aa0", "#5aaac0");
+  // 라운지 원형 테이블(다크 그레이) + 화이트 사이드 테이블 + 큐브(틸·네이비)
+  p.circle(L.tx0 + 28, L.ty0 + 58, 9, C("#3a3c40")); p.circle(L.tx0 + 27, L.ty0 + 57, 7, C("#55585e"));
+  p.circle(L.sx1 - 4, L.sy0 - 4, 5, C("#f4f4f2"));
+  const cube = (x, y, c, hl, sh) => { p.rect(x, y, 11, 10, C(c)); p.rect(x, y, 11, 2, C(hl)); p.rect(x + 10, y + 2, 1, 8, C(sh)); };
+  cube(L.tx0 + 6, L.ty1 - 24, "#3a8aa8", "#5aaac8", "#2a6a88");
+  cube(L.tx0 + 18, L.ty1 - 20, "#2a3e8a", "#4058a8", "#1c2c6a");
+  // 탕비실 ─ 상부 블랙 수납장 + 화이트 서브웨이 타일 + 화이트 상판
+  const y0 = K.y0, cw = K.x1 - 22;
+  p.rect(0, y0, K.x1, 6, C("#1c1c22")); for (let x = 0; x < K.x1; x += 18) p.rect(x, y0, 1, 6, C("#33333a"));
+  p.rect(0, y0 + 6, cw, 4, C("#f2f0ea")); for (let x = 0; x < cw; x += 4) p.rect(x + ((x >> 2) % 2) * 2, y0 + 8, 1, 1, C("#d8d6d0"));
+  p.rect(0, y0 + 10, cw, 6, C("#fbfbf9")); p.rect(0, y0 + 15, cw, 1, C("#c8c6c0"));
+  // 양문형 냉장고(실버) · 정수기 · 커피머신 · 전자레인지
+  p.rect(2, y0 + 4, 16, 13, C("#b8bcc2")); p.rect(2, y0 + 4, 16, 1, C("#e0e4ea")); p.rect(10, y0 + 5, 1, 12, C("#8a8e94")); p.rect(8, y0 + 8, 1, 4, C("#e8eaee")); p.rect(12, y0 + 8, 1, 4, C("#e8eaee"));
+  p.rect(21, y0 + 6, 6, 10, C("#f8f8f8")); p.rect(21, y0 + 6, 6, 1, C("#ffffff")); p.rect(23, y0 + 10, 2, 2, C("#3a3a40"));
+  p.rect(cw - 34, y0 + 9, 6, 6, C("#1c1c22")); p.rect(cw - 33, y0 + 10, 2, 1, C("#5a5a62"));
+  p.rect(cw - 22, y0 + 9, 11, 6, C("#f2ece0")); p.circle(cw - 18, y0 + 12, 2, C("#3a3a40"));
+  // 오른쪽 유리 파티션(블랙 프레임)
+  p.rect(K.x1 - 5, y0, 5, H - y0, C("#1c1c22")); p.rect(K.x1 - 4, y0 + 2, 3, H - y0 - 2, C("#d8e4e8")); p.rect(K.x1 - 3, y0 + 2, 1, H - y0, C("#ffffff"));
+  // 큰 관엽 화분(왼쪽 창가)
+  p.circle(8, H - 16, 7, C("#5a5c60")); p.circle(8, H - 16, 5, C("#3a2a20"));
+  for (const [dx, dy, r] of [[-2, -6, 5], [5, -9, 5], [0, -14, 5], [7, -2, 4], [-4, 0, 4], [3, -18, 4]]) { p.circle(8 + dx, H - 20 + dy, r, C("#3f8a3a")); p.circle(7 + dx, H - 21 + dy, r - 2, C("#6ab84a")); }
+  // 버처블록 원목 바 테이블 + 블랙 스툴
+  const tw = K.bx1 - K.bx0;
+  p.rect(K.bx0, K.by0, tw, 11, C("#dcae6a"));
+  for (let x = K.bx0; x < K.bx1; x++) for (let yy = 1; yy < 10; yy++) if (h2(x >> 1, (K.by0 + yy) >> 1 ^ (x >> 4)) < 0.35) p.rect(x, K.by0 + yy, 1, 1, C(h2(x >> 3, yy) < 0.5 ? "#c89452" : "#e8bc7a"));
+  for (let yy = 2; yy < 10; yy += 3) p.rect(K.bx0, K.by0 + yy, tw, 1, C("#c89452"));
+  p.rect(K.bx0, K.by0, tw, 1, C("#f4cc8a")); p.rect(K.bx0, K.by0 + 10, tw, 1, C("#8a6440"));
+  p.rect(K.bx0 + 2, K.by0 + 11, 2, 2, C("#1c1c22")); p.rect(K.bx1 - 4, K.by0 + 11, 2, 2, C("#1c1c22"));
+  p.rect(K.bx0 + tw / 2 - 5, K.by0 + 2, 6, 4, C("#8aa8e0")); p.rect(K.bx0 + tw / 2 - 4, K.by0 + 1, 4, 1, C("#ffffff")); // 티슈
+  const stool = (sx, sy) => { p.circle(sx, sy, 4, C("#1c1c22")); p.circle(sx - 1, sy - 1, 2, C("#3a3a42")); p.rect(sx - 3, sy + 4, 1, 2, C("#1c1c22")); p.rect(sx + 3, sy + 4, 1, 2, C("#1c1c22")); };
+  for (let i = 0; i < 4; i++) { const sx = K.bx0 + 10 + Math.round(i * (tw - 20) / 3); stool(sx, K.by0 - 8); stool(sx, K.by0 + 19); }
+  // 트랙 조명 빛
+  for (let x = 20; x < cw; x += 34) p.glow(x, y0 + 30, 16, C("#fff2d8"), 0.06);
   // 펜던트 조명 빛
   p.glow((L.tx0 + L.tx1) / 2, (L.ty0 + L.ty1) / 2, 70, C("#ffffff"), 0.12);
   p.glow((K.bx0 + K.bx1) / 2, K.by0, 60, C("#fff2d8"), 0.18);
