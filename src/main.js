@@ -333,7 +333,7 @@ class Resident {
     if (d > 1.5) {
       if (this.timer > 0 && this.state !== "walk") { this.timer -= dt; return; } // 감정표현 중엔 잠깐 멈춤
       const tx = s.jump ? s.jx : s.x, ty = s.jump ? s.jy : s.y, ex = tx - this.x, ey = ty - this.y, e = Math.max(0.001, Math.hypot(ex, ey));
-      const sp = this.speed * (s.fast ? 4.2 : 1.5);
+      const sp = this.speed * (s.flee ? 7 : s.fast ? 4.2 : 1.5);
       if (e < 1.5 && s.jump) { this.x = s.x; this.y = s.y; this.hop = 0.7; this.say(choose(CEO_LINES), 4); return; }
       this.state = "walk";
       this.x += (ex / e) * Math.min(sp * dt, e); this.y += (ey / e) * Math.min(sp * dt, e);
@@ -1308,10 +1308,12 @@ function applyQuiz(q, votes) {
       }, 700 + i * 320));
       setTimeout(() => losers.slice(nZap).forEach((r) => {
         if (!quizOn() || r.zapped) return;
-        const left = r.x < W / 2 ? Math.random() < 0.7 : Math.random() < 0.3;
-        r.seat = { x: left ? -30 : W + 30, y: r.y + (Math.random() - 0.5) * 40, stand: true, fast: true, flee: true };
+        // 가장 가까운 화면 가장자리로 전력질주
+        const dl = r.x, dr = W - r.x, db = H - r.y;
+        const ex = Math.min(dl, dr, db) === db ? { x: r.x + (Math.random() - 0.5) * 60, y: H + 40 } : dl < dr ? { x: -40, y: r.y + (Math.random() - 0.5) * 40 } : { x: W + 40, y: r.y + (Math.random() - 0.5) * 40 };
+        r.seat = { x: ex.x, y: ex.y, stand: true, fast: true, flee: true }; r.timer = 0; r.state = "walk"; r.fx = r.fx.filter((f) => !f.loop);
         r.speed = Math.max(r.speed, 26); r.say(choose(["도망쳐!!", "살려줘요 😱", "으아아악", "엄마!!"]), 1.6);
-      }), 700 + nZap * 320 + 200);
+      }), 500);
     }, 900);
   }
   renderQuizBar();
@@ -1433,5 +1435,5 @@ connectLive({
 renderLists();
 if (params.get("arrive")) setTimeout(() => randomArrivals(+params.get("arrive"), true), 400);
 // 테스트용(서버에 아무것도 보내지 않음): ?debug 로 열면 콘솔에서 광장 캐릭터를 직접 움직일 수 있다
-if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride, explode: () => explodeTree(), leaveAll: () => { for (const id of [...present.keys()]) leave(id); }, show: (sh) => applyShow(sh), quiz: (q, v) => applyQuiz(q, v), vote: onVote, ceremony: (on) => setCeremony(on), arrive: (id, m) => arrive(id, m || "") };
+if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride, explode: () => explodeTree(), leaveAll: () => { for (const id of [...present.keys()]) leave(id); }, show: (sh) => applyShow(sh), quiz: (q, v) => applyQuiz(q, v), vote: onVote, get qs() { return quizSt; }, ceremony: (on) => setCeremony(on), arrive: (id, m) => arrive(id, m || "") };
 (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(tick));
