@@ -924,6 +924,20 @@ const treeFromRow = () => (tree.gone ? bigTree.h : tree.boom < 0 ? 0 : Math.ceil
 // ---------- 이스터에그: 단상 뒤 출입문 더블클릭 → 유플리트 사옥 ⇄ 광장 ----------
 officeScene = null;
 const OFFICE = officeLayout(W, H);
+// 사옥 왼쪽 위 LED 스크린에 유튜브 영상(?yt=영상ID 또는 링크, 없으면 기본 영상)
+const TV_DEFAULT = "";
+function ytId(v) { if (!v) return ""; const m = String(v).match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/); return m ? m[1] : /^[\w-]{11}$/.test(v) ? v : ""; }
+let tvBox = null;
+function setTv(on) {
+  const id = ytId(params.get("yt")) || ytId((() => { try { return localStorage.getItem("songnyeonhoe-yt"); } catch { return ""; } })()) || TV_DEFAULT;
+  if (!on || !id) { tvBox?.remove(); tvBox = null; return; }
+  const lw = Math.min(110, Math.round(W * 0.22));
+  tvBox = document.createElement("div");
+  Object.assign(tvBox.style, { position: "absolute", left: 8 * S + "px", top: 5 * S + "px", width: lw * S + "px", height: 32 * S + "px", overflow: "hidden", zIndex: 1, pointerEvents: "none", background: "#000" });
+  const w = lw * S, h = w * 9 / 16;
+  tvBox.innerHTML = `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&modestbranding=1&playsinline=1&rel=0" allow="autoplay; encrypted-media" style="position:absolute;left:0;top:${(32 * S - h) / 2}px;width:${w}px;height:${h}px;border:0"></iframe>`;
+  stage.appendChild(tvBox);
+}
 const OFFICE_LINES = {
   sofa: { hi: ["아 푹신하다~", "여기 명당이네요", "잠깐 쉬었다 갈게요 😌", "이 소파 진짜 편해"], mid: ["쿠션 색 예쁘다", "5분만 눈 붙일까…", "여기서 회의해도 되겠다", "올해 진짜 바빴죠?"], bye: ["자, 다시 일하러!", "충전 완료 💪"] },
   bar: { hi: ["간식 뭐 있어요?", "여기 앉아도 되죠?", "오늘 저녁 뭐 먹지?"], mid: ["과자 하나만 먹을게요 🍪", "이 테이블 원목 좋다", "내년 워크숍 어디 가요?", "수다 타임 ☕"], bye: ["잘 먹었습니다!", "이제 들어가 볼게요"] },
@@ -954,6 +968,7 @@ function toggleOffice() {
     // 벽·소파 안에 갇힌 사람은 빈 자리로
     for (const r of people) { if (r.seat) continue; let k = 0; while (blocked(r.x, r.y) && k++ < 200) { r.x = rnd(20, W - 20); r.y = rnd(FLOOR_TOP + 14, H - 10); } }
     $("#presT").textContent = officeOn ? "출근한 사람" : "송년회 참석 중";
+    setTv(officeOn);
     $("#waitT").textContent = officeOn ? "아직 출근 전" : "아직 도착 전";
   }, 340);
 }
