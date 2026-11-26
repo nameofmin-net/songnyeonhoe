@@ -3,7 +3,7 @@ import { ALL, adminKey, adminPost, avatarURL, sortedByName } from "./joinform.js
 
 const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const STEPS_MERIT = [["타이틀", "커튼이 열리고 상 이름만"], ["수상자 공개", "프로젝트 이름과 수상자 등장"], ["축하", "꽃가루 · 팡파르 · 박수"]];
-const STEPS_UPL = [["오프닝", "올해의 유플리더스"], ["상 소개", "상 이름 · 설명 · 상금"], ["발표", "후보 레이스 → 최후 1인"], ["축하", "꽃가루 · 팡파르"]];
+const STEPS_UPL = [["오프닝", "올해의 유플리더스"], ["상 소개", "상 이름 · 설명 · 상금"], ["발표", "후보 등장 → 조명 → 수상자"], ["축하", "꽃가루 · 팡파르"]];
 export const stepsOf = (kind) => (kind === "upleaders" ? STEPS_UPL : STEPS_MERIT);
 // 올해의 유플리더스 상 목록(상금 기본값). 설명은 행사 자료에 있는 루키만 미리 채움.
 export const UPL_AWARDS = [
@@ -132,7 +132,7 @@ export function mountController({ entries }) {
           <div class="card">
             <h4><span class="tag ${x.kind === "upleaders" ? "u" : ""}">${x.kind === "upleaders" ? "유플리더스" : "공로상"}</span>${esc(x.name)}</h4>
             <p>${x.kind === "upleaders"
-              ? `수상자 ${x.winner >= 0 ? esc(ALL[x.winner]?.name) : "미정"} · 경쟁자 ${(x.rivals || []).length}명${x.prizeOn && x.prize ? ` · 상금 ${esc(x.prize)}` : ""}`
+              ? `수상자 ${x.winner >= 0 ? esc(ALL[x.winner]?.name) : "미정"} · 후보 ${(x.rivals || []).length}명${x.prizeOn && x.prize ? ` · 상금 ${esc(x.prize)}` : ""}`
               : `${esc(x.title)}${x.sub ? ` · ${esc(x.sub)}` : ""}${x.prizeOn && x.prize ? ` · 상금 ${esc(x.prize)}` : ""}<br>수상자 ${x.people.length}명${x.people.length ? ` — ${x.people.slice(0, 6).map((id) => esc(ALL[id]?.name)).join(", ")}${x.people.length > 6 ? " 외" : ""}` : ""}`}</p>
             <div class="row"><button class="big play" data-a="play" data-sid="${x.sid}" ${busy ? "disabled" : ""}>▶ 재생</button><button class="ghost" data-a="edit" data-sid="${x.sid}">수정</button><button class="ghost" data-a="del" data-sid="${x.sid}">삭제</button></div>
           </div>`).join("") : `<div class="empty">아직 메뉴가 없어요.<br>위의 '새 메뉴 만들기'로 첫 시상을 만들어 보세요.</div>`}
@@ -159,13 +159,13 @@ export function mountController({ entries }) {
     if (sortMode === "here") ids = [...ids.filter((id) => here.has(id)), ...ids.filter((id) => !here.has(id))];
     if (draft.kind === "upleaders") {
       const rv = new Set(draft.rivals);
-      return ids.map((id) => `<label class="${draft.winner === id || rv.has(id) ? "on" : ""}" data-row="${id}"><img src="${avatarURL(id, 2, true)}" alt=""><span class="nm">${esc(ALL[id].name)}${ALL[id].rank ? `<small>${ALL[id].rank}</small>` : ""}${here.has(id) ? ` <span class="in">입장</span>` : ""}</span><span class="roles"><button type="button" class="win ${draft.winner === id ? "on" : ""}" data-a="win" data-id="${id}">🏆 수상</button><button type="button" class="riv ${rv.has(id) ? "on" : ""}" data-a="riv" data-id="${id}">🏃 경쟁</button></span></label>`).join("") || `<div class="empty">'${esc(query)}' 이름이 없어요</div>`;
+      return ids.map((id) => `<label class="${draft.winner === id || rv.has(id) ? "on" : ""}" data-row="${id}"><img src="${avatarURL(id, 2, true)}" alt=""><span class="nm">${esc(ALL[id].name)}${ALL[id].rank ? `<small>${ALL[id].rank}</small>` : ""}${here.has(id) ? ` <span class="in">입장</span>` : ""}</span><span class="roles"><button type="button" class="win ${draft.winner === id ? "on" : ""}" data-a="win" data-id="${id}">🏆 수상</button><button type="button" class="riv ${rv.has(id) ? "on" : ""}" data-a="riv" data-id="${id}">🙋 후보</button></span></label>`).join("") || `<div class="empty">'${esc(query)}' 이름이 없어요</div>`;
     }
     const pickedSet = new Set(draft.people);
     return ids.map((id) => `<label class="${pickedSet.has(id) ? "on" : ""}"><input type="checkbox" data-id="${id}" ${pickedSet.has(id) ? "checked" : ""}><img src="${avatarURL(id, 2, true)}" alt=""><span class="nm">${esc(ALL[id].name)}${ALL[id].rank ? `<small>${ALL[id].rank}</small>` : ""}</span>${here.has(id) ? `<span class="in">입장</span>` : ""}</label>`).join("") || `<div class="empty">'${esc(query)}' 이름이 없어요</div>`;
   }
   const pickedHTML = () => draft.kind === "upleaders"
-    ? `<span class="none">🏆 ${draft.winner >= 0 ? esc(ALL[draft.winner].name) : "수상자 미정"} · 🏃 경쟁 ${draft.rivals.length}/7${draft.rivals.length ? " — " + draft.rivals.map((id) => esc(ALL[id].name)).join(", ") : ""}</span>`
+    ? `<span class="none">🏆 ${draft.winner >= 0 ? esc(ALL[draft.winner].name) : "수상자 미정"} · 🙋 후보 ${draft.rivals.length}/7${draft.rivals.length ? " — " + draft.rivals.map((id) => esc(ALL[id].name)).join(", ") : ""}</span>`
     : (draft.people.length ? draft.people.map((id) => `<button data-a="unpick" data-id="${id}">${esc(ALL[id].name)} ✕</button>`).join("") : `<span class="none">아래에서 체크해 주세요</span>`);
   function refreshPicked() { el.querySelector(".picked").innerHTML = pickedHTML(); const c = el.querySelector(".pcnt"); if (c) c.textContent = draft.people.length; }
   function refreshList() { el.querySelector(".plist").innerHTML = listHTML(); }
@@ -196,7 +196,7 @@ export function mountController({ entries }) {
         <label class="f">상 설명 <small>'상 소개' 단계에 나와요</small><textarea data-f="desc" maxlength="200" placeholder="예) 올해 입사한 유플리더 중…">${esc(draft.desc)}</textarea></label>
         ${prizeHTML()}
         <label class="f">수상 소감·인용구 <small>발표 때 수상자 아래에 나와요 (선택)</small><textarea data-f="quote" maxlength="160" placeholder="예) 세상을 보는 데는 두 가지 방법이 있습니다…">${esc(draft.quote)}</textarea></label>
-        ${peopleBox("수상자 1명(🏆)과 레이스에서 같이 달릴 경쟁자(🏃 최대 7명)")}`;
+        ${peopleBox("수상자 1명(🏆)과 같이 무대에 설 후보(🙋 최대 7명)")}`;
   }
   function meritFormHTML() {
     return `
@@ -240,7 +240,7 @@ export function mountController({ entries }) {
       const n = +b.dataset.id;
       if (a === "win") { draft.winner = draft.winner === n ? -1 : n; draft.rivals = draft.rivals.filter((x) => x !== n); }
       else if (draft.rivals.includes(n)) draft.rivals = draft.rivals.filter((x) => x !== n);
-      else { if (draft.rivals.length >= 7) { alert("경쟁자는 최대 7명까지예요."); return; } draft.rivals = [...draft.rivals, n]; if (draft.winner === n) draft.winner = -1; }
+      else { if (draft.rivals.length >= 7) { alert("후보는 최대 7명까지예요."); return; } draft.rivals = [...draft.rivals, n]; if (draft.winner === n) draft.winner = -1; }
       const sc = el.querySelector(".plist").scrollTop; refreshList(); el.querySelector(".plist").scrollTop = sc; refreshPicked(); return;
     }
     if (a === "sort") { sortMode = b.dataset.v; el.querySelectorAll(".seg button").forEach((x) => x.classList.toggle("on", x.dataset.v === sortMode)); refreshList(); return; }

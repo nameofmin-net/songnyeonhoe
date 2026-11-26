@@ -1,14 +1,14 @@
 // 무게감 있는 빨간 커튼: 스프링(질량·감쇠)으로 여닫히고, 밑단은 한 박자 늦게 따라오며 흔들리고,
 // 열릴수록 주름이 바깥쪽으로 몰려 접힌다. 저해상도 캔버스에 그려 픽셀 느낌을 맞춘다.
 const LW = 320, LH = 180, PLEATS = 13;
-const HALF = LW / 2 + 2;
+const HALF = LW / 2 + 2, OPEN = 1.4;
 
 export function createCurtain(canvas) {
   canvas.width = LW; canvas.height = LH;
   const g = canvas.getContext("2d");
   // 0 = 닫힘(가운데서 만남), 1 = 열림(양옆으로 몰림)
-  const top = { x: 1, v: 0 }, hem = { x: 1, v: 0 };
-  let target = 1, raf = 0, last = 0, t = 0, waiters = [];
+  const top = { x: OPEN, v: 0 }, hem = { x: OPEN, v: 0 };
+  let target = OPEN, raf = 0, last = 0, t = 0, waiters = [];
 
   function step(dt) {
     // 윗단: 레일에 걸린 고리 → 묵직한 스프링(살짝 넘쳤다 돌아옴)
@@ -29,7 +29,7 @@ export function createCurtain(canvas) {
     // side -1: 왼쪽(바깥=0), +1: 오른쪽(바깥=LW)
     for (let y = 0; y < LH; y++) {
       const fy = y / LH, o = top.x + (hem.x - top.x) * fy * fy; // 아래로 갈수록 밑단 값을 따름
-      const width = Math.max(10, HALF * (1 - 0.88 * Math.min(1.08, Math.max(-0.05, o))));
+      const width = Math.max(10, HALF * (1 - 0.88 * Math.min(1, Math.max(-0.05, o))));
       // 움직일 때 천이 부풀어 출렁
       const billow = (top.v - hem.v) * 6 * Math.sin(fy * Math.PI) + Math.sin(t * 1.3 + fy * 5) * 0.6 * (1 - settledness());
       const cols = 64;
@@ -49,7 +49,7 @@ export function createCurtain(canvas) {
       g.fillStyle = "rgba(0,0,0,0.25)"; g.fillRect(Math.floor(side < 0 ? ex : ex - 3), y, 3, 1);
     }
     // 밑단 술(펄럭이는 금색 점선)
-    const o = hem.x, width = Math.max(10, HALF * (1 - 0.88 * Math.min(1.08, Math.max(-0.05, o))));
+    const o = hem.x, width = Math.max(10, HALF * (1 - 0.88 * Math.min(1, Math.max(-0.05, o))));
     for (let x = 0; x < width; x += 2) { g.fillStyle = (x / 2) % 2 ? "#ffd84a" : "#a8741a"; g.fillRect(side < 0 ? x : LW - x - 2, LH - 2, 2, 2); }
   }
   let settle = 0;
@@ -59,11 +59,13 @@ export function createCurtain(canvas) {
     for (let i = 0; i < 4; i++) step(dt / 4);
     settle = settled() ? Math.min(1, settle + dt) : 0;
     g.clearRect(0, 0, LW, LH);
-    if (!(target === 1 && top.x > 0.995 && hem.x > 0.99 && settled())) { drawHalf(-1); drawHalf(1); }
+    // 다 모인 뒤에도 계속 바깥으로 밀려 나가 화면에서 사라진다
+    const shift = Math.max(0, Math.min(top.x, hem.x) - 1) / (OPEN - 1) * (HALF * 0.12 + 24);
+    if (!(target === OPEN && settled())) for (const sd of [-1, 1]) { g.save(); g.translate(sd * shift, 0); drawHalf(sd); g.restore(); }
     if (settled()) {
       waiters.forEach((f) => f()); waiters = [];
       raf = 0; last = 0;
-      if (target === 1) g.clearRect(0, 0, LW, LH);
+      if (target === OPEN) g.clearRect(0, 0, LW, LH);
       return;
     }
     raf = requestAnimationFrame(frame);
@@ -75,7 +77,7 @@ export function createCurtain(canvas) {
   }
   return {
     close: () => go(0),
-    open: () => go(1),
+    open: () => go(OPEN),
     /** 거의 닫혔는지(내용 교체 타이밍) */
     get closedEnough() { return top.x < 0.06; },
   };
