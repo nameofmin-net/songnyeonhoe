@@ -1078,7 +1078,7 @@ async function startSpotlight(sh) {
   cone.style.opacity = 1;
   // 원뿔 조명이 줄 위를 부드럽게 좌우로 훑다가 점점 느려지며 수상자에서 멈춘다
   const xs = els.map((e) => pos(e)[0]), lo = Math.min(...xs) - 10, hi = Math.max(...xs) + 10, mid = (lo + hi) / 2, amp = (hi - lo) / 2;
-  const wx = xs[winIx], T = 9000;
+  const wx = xs[winIx], T = 12000;
   cone.style.transition = "none";
   await new Promise((done) => {
     const t0 = performance.now(); let ph = Math.random() * 6.28, lastT = t0;
@@ -1086,7 +1086,7 @@ async function startSpotlight(sh) {
     const step = (ms) => {
       if (!showCur || showCur.step !== 2) return done();
       const u = Math.min(1, (ms - t0) / T), dt = (ms - lastT) / 1000; lastT = ms;
-      ph += dt * (3.2 - 2.6 * u); // 점점 느려짐
+      ph += dt * (1.3 - 1.0 * u); // 점점 느려짐
       const sweep = mid + amp * Math.sin(ph), k = sm(0.72, 1, u);
       const cxNow = sweep * (1 - k) + wx * k;
       cone.style.transform = `translateX(${cxNow.toFixed(1)}px)`;
