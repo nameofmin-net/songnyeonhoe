@@ -14,14 +14,15 @@ function mulberry(seed) {
 // ---------- 대형 트리 ----------
 // 로컬 좌표: 바닥 중심이 (0, 0), 위로 음수. 폭 약 96, 높이 약 128.
 const TW = 124, TH = 140, TOX = 62, TOY = 136;
+const K = 0.82; // 트리 크기 배율
 const TIERS = [ // [윗변 y, 아랫변 y, 아랫변 반폭]
   [-118, -96, 18],
   [-104, -78, 28],
   [-88, -58, 37],
   [-70, -38, 46],
   [-52, -16, 54],
-];
-const STAR_Y = -122;
+].map(([a, b, w], i, all) => i === all.length - 1 ? [Math.round(a * K), b, Math.round(w * K)] : [Math.round(a * K), Math.round(b * K), Math.round(w * K)]);
+const STAR_Y = Math.round(-122 * K);
 
 function inTree(x, y) {
   for (const [y0, y1, hw] of TIERS) {
@@ -65,7 +66,7 @@ function buildTree() {
   // 금색 반짝이 줄(사선)
   const gold = C("#f2c84b"), goldD = C("#b8862a");
   for (let i = 0; i < 4; i++) {
-    const yA = -98 + i * 22;
+    const yA = Math.round((-98 + i * 22) * K);
     for (let x = -54; x <= 54; x++) {
       const y = Math.round(yA + x * 0.28 + Math.sin(x * 0.25) * 1.5);
       if (inTree(x, y) && inTree(x, y + 1)) p.px(x, y, x < 0 ? gold : goldD);
@@ -75,7 +76,7 @@ function buildTree() {
   const r = mulberry(7), ORN = ["#d94f4f", "#4a7fd4", "#f2c84b", "#e27fb4", "#c7c9d6"].map(C);
   const balls = [];
   for (let n = 0; n < 400 && balls.length < 22; n++) {
-    const x = Math.round((r() - 0.5) * 90), y = Math.round(-108 + r() * 90);
+    const x = Math.round((r() - 0.5) * 90 * K), y = Math.round((-108 + r() * 90) * K);
     if (!inTree(x, y) || !inTree(x - 2, y + 2) || !inTree(x + 2, y + 2)) continue;
     if (balls.some((b) => Math.abs(b[0] - x) + Math.abs(b[1] - y) < 9)) continue;
     balls.push([x, y]);
@@ -103,7 +104,7 @@ function buildTree() {
   const bulbs = [];
   const BC = ["#ff5a5a", "#ffd84a", "#5ae08a", "#5ab4ff", "#ff8ad8", "#fff3c0"].map(C);
   for (let n = 0; n < 800 && bulbs.length < 46; n++) {
-    const x = Math.round((r() - 0.5) * 96), y = Math.round(-112 + r() * 96);
+    const x = Math.round((r() - 0.5) * 96 * K), y = Math.round((-112 + r() * 96) * K);
     if (!inTree(x, y) || !inTree(x, y + 1)) continue;
     if (bulbs.some((b) => Math.abs(b.x - x) + Math.abs(b.y - y) < 7) || balls.some((b) => Math.abs(b[0] - x) + Math.abs(b[1] - y) < 4)) continue;
     bulbs.push({ x, y, c: BC[bulbs.length % BC.length], ph: r() * 6.28, sp: 1.5 + r() * 2.5 });
