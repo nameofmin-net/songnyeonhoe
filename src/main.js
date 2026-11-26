@@ -933,15 +933,6 @@ const TV_DEFAULT = "AGGhnmnLqKU";
 function ytId(v) { if (!v) return ""; const m = String(v).match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/); return m ? m[1] : /^[\w-]{11}$/.test(v) ? v : ""; }
 let tvBox = null, tvPlaying = false, tvId = "";
 // 크롬은 사용자 조작 없이 소리를 켜면 영상을 멈춰 버린다 → 음소거로 먼저 재생하고, 화면을 처음 누를 때 소리를 켠다
-let officeWait = null;
-function officePending() {
-  if (officeWait) return;
-  officeWait = document.createElement("div");
-  officeWait.textContent = "🏢 화면을 클릭하면 사옥으로 이동해요";
-  Object.assign(officeWait.style, { position: "fixed", left: "50%", bottom: "24px", transform: "translateX(-50%)", zIndex: 50, padding: "10px 18px", font: "inherit", fontSize: "16px", color: "#1c1624", background: "#ffd84a", border: "2px solid #fff3b0", boxShadow: "0 4px 0 #8a6a10", pointerEvents: "none" });
-  document.body.appendChild(officeWait);
-  addEventListener("pointerdown", function go() { removeEventListener("pointerdown", go, true); if (!officeWait) return; officeWait.remove(); officeWait = null; if (!officeOn) toggleOffice(); }, true);
-}
 let tvUnmuted = 0, tvTryUnmute = 0, tvUnmuteAt = 0;
 addEventListener("pointerdown", () => { if (tvBox && !tvUnmuted) { tvUnmuted = performance.now(); tvCmd("unMute"); tvCmd("setVolume", [80]); tvCmd("playVideo"); tvPlaying = true; } }, true);
 const TV_POS_KEY = () => "songnyeonhoe-ytpos-" + tvId;
@@ -1576,12 +1567,7 @@ connectLive({
   emote: onEmote,
   show: applyShow,
   mode: (m) => setCeremony(m === "ceremony"),
-  office: (on) => {
-    // 새로고침 직후(아직 아무도 안 누름)엔 사옥으로 바로 가지 않고, 화면을 누르면 전환 → 그 클릭 덕에 유튜브가 소리와 함께 재생된다
-    if (on && !officeOn && !navigator.userActivation?.hasBeenActive) { officePending(); return; }
-    officeWait?.remove(); officeWait = null;
-    if (!!on !== officeOn) toggleOffice();
-  },
+  office: (on) => { if (!!on !== officeOn) toggleOffice(); },
   reload: () => location.reload(),
   quiz: (q, v) => applyQuiz(q, v),
   vote: onVote,
