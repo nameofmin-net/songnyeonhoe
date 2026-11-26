@@ -709,7 +709,16 @@ function tick(nowMs) {
   frame.color.fill(0); frame.light.set(staticLight);
   const Q = quizVis;
   if (Q) frame.light.set(quizScene.light); else drawGarland(now);
-  if (Q) drawDoll(painterFor(frame), CX, WALL + 6, quizSt.dollFront, quizSt.dollFront && quizSt.q?.phase === "reveal", now);
+  let dollY = 0;
+  if (Q && quizSt.drop) {
+    const D = quizSt.drop; D.t += dt;
+    // 하늘에서 떨어져(가속) 쿵! 한 번 살짝 튀고 멈춤
+    const fall = 0.55, t = D.t;
+    if (t < fall) dollY = -170 * (1 - (t / fall) ** 2);
+    else { if (!D.landed) { D.landed = true; sfx.boom(); shakeStage(true); landDust(); } const b = t - fall; dollY = b < 0.3 ? -Math.sin((b / 0.3) * Math.PI) * 10 : 0; }
+    if (t > 1.2) quizSt.drop = null;
+  }
+  if (Q) drawDoll(painterFor(frame), CX, WALL + 6 + dollY, quizSt.dollFront, quizSt.dollFront && quizSt.q?.phase === "reveal", now);
   if (Q && quizSt.laser) {
     const L = quizSt.laser; L.t += dt;
     const p = painterFor(frame), tx = L.r.x, ty = L.r.y - 14, a = Math.max(0, 1 - L.t / 0.3);
@@ -1221,6 +1230,7 @@ function drawStorm(dt) {
   const front = -120 + u * (W + 240);
   if (!storm.swapped && u > 0.5) {
     storm.swapped = true; quizVis = storm.to;
+    if (storm.to) quizSt.drop = { t: 0, landed: false };
     for (const r of people) { r.cache.clear(); r.actor = actorFor(r.sprite(0, 0, false)); }
   }
   for (let x = Math.max(0, Math.floor(front - 120)); x < Math.min(W, front + 40); x++) {
@@ -1233,6 +1243,9 @@ function drawStorm(dt) {
     p.rect(Math.round(q.x), Math.round(q.y), Math.round(q.l), 1, C(q.c), 0.85);
   }
   if (u >= 1) storm.t = -1;
+}
+function landDust() {
+  for (let i = 0; i < 70; i++) { const a = Math.PI + Math.random() * Math.PI; tree.dust.push({ x: CX + (Math.random() - 0.5) * 30, y: WALL + 6, vx: Math.cos(a) * (40 + Math.random() * 90), vy: Math.sin(a) * (10 + Math.random() * 30), c: C(choose(["#e8d6b0", "#c9a46c", "#f4ead4"])), ash: C("#d8c49a"), life: 0.6 + Math.random() * 0.6, t: 0 }); }
 }
 function shakeStage(big) { const st = $("#stage"); st.classList.remove("hit", "boom"); void st.offsetWidth; st.classList.add(big ? "boom" : "hit"); }
 const QUIZ_LINES = ["이거 O 아니야?", "X 같은데…", "무궁화 꽃이…", "살려줘요 😱", "확실해!", "아 몰라 찍자", "옆사람 따라가야지", "두근두근", "정답 뭐야??"];
@@ -1251,7 +1264,12 @@ function applyQuiz(q, votes) {
   if (quizOn() && !quizScene) quizScene = buildQuizBg(W, H);
   if (quizOn() !== was) {
     startStorm(quizOn());
-    if (quizOn()) { setTrack("quiz"); for (const r of people) { r.speech = null; placeQuiz(r); } setTimeout(() => { if (quizOn()) $("#quizBar").hidden = false; }, 900); }
+    if (quizOn()) {
+      setTrack("quiz");
+      for (const r of people) { r.speech = null; r.seat = null; r.state = "idle"; r.timer = 4; r.dir = 0; }
+      // 인형이 떨어진 뒤: 모두 어리둥절 → 잠시 뒤 준비 광장(가운데)으로
+      setTimeout(() => { if (!quizOn()) return; for (const r of people) { r.dir = 0; r.state = "idle"; r.timer = 3; r.play(FX.confused, true, 2.2); if (Math.random() < 0.45) r.say(choose(["뭐야?!", "저게 뭐야…", "어디야 여기?", "헉 인형이…", "???"]), 2); } }, 1500);
+      setTimeout(() => { if (!quizOn()) return; for (const r of people) placeQuiz(r); }, 3900); setTimeout(() => { if (quizOn()) $("#quizBar").hidden = false; }, 900); }
     else {
       setTrack("carol"); $("#quizBar").hidden = true; quizSt.laser = null;
       for (const r of people) r.zapped = false;
@@ -1263,7 +1281,8 @@ function applyQuiz(q, votes) {
   if (!quizOn()) return;
   const Qn = quizSt.q;
   // 새 문제: 모두 가운데로, 인형은 뒤돌아 노래
-  if (Qn.idx !== prevIdx || (Qn.phase === "ask" && prevPhase !== "ask")) {
+  if (!was) quizSt.dollFront = false;
+  else if (Qn.idx !== prevIdx || (Qn.phase === "ask" && prevPhase !== "ask")) {
     quizSt.dollFront = false;
     for (const r of people) { if (r.zapped && !(Qn.out || []).includes(r.d.id)) { r.zapped = false; r.x = W / 2 + (Math.random() - 0.5) * 60; r.y = H - 20; } placeQuiz(r); r.fx = r.fx.filter((f) => !f.loop); }
     sfx.drumroll(0.6);
