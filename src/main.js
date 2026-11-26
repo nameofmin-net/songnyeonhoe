@@ -990,7 +990,7 @@ function toggleOffice() {
     for (const r of people) if (r.seat && (r.seat.office || r.seat.leave)) { r.seat = null; r.state = "idle"; r.timer = rnd(0.3, 1.5); }
     // 벽·소파 안에 갇힌 사람은 빈 자리로
     for (const r of people) { if (r.seat) continue; let k = 0; while (blocked(r.x, r.y) && k++ < 200) { r.x = rnd(20, W - 20); r.y = rnd(FLOOR_TOP + 14, H - 10); } }
-    $("#presT").textContent = officeOn ? "출근한 사람" : "송년회 참석 중";
+    document.body.classList.toggle("office", officeOn), $("#presT").textContent = officeOn ? "출근한 사람" : "송년회 참석 중";
     setTv(officeOn); setTrack(officeOn ? "none" : quizOn() ? "quiz" : "carol");
     $("#waitT").textContent = officeOn ? "아직 출근 전" : "아직 도착 전";
   }, 340);
@@ -1328,7 +1328,7 @@ async function doUpl(sh, isNew) {
   if (sh.step === 2 && prev !== 3) startSpotlight(sh);
   if (sh.step === 3) { if (!showCard.querySelector(".up-2.done")) revealWinner(sh); sfx.fanfare(); sfx.applause(3); confettiRain(); }
 }
-function applyShow(sh) { if (sh && officeOn) { officeOn = false; setTv(false); for (const r of people) if (r.seat?.office || r.seat?.leave) r.seat = null; $("#presT").textContent = "송년회 참석 중"; $("#waitT").textContent = "아직 도착 전"; } setTrack(sh ? "award" : quizOn() ? "quiz" : "carol"); showChain = showChain.then(() => doShow(sh)).catch(() => {}); }
+function applyShow(sh) { if (sh && officeOn) { officeOn = false; setTv(false); for (const r of people) if (r.seat?.office || r.seat?.leave) r.seat = null; document.body.classList.toggle("office", officeOn), $("#presT").textContent = "송년회 참석 중"; $("#waitT").textContent = "아직 도착 전"; } setTrack(sh ? "award" : quizOn() ? "quiz" : "carol"); showChain = showChain.then(() => doShow(sh)).catch(() => {}); }
 
 // ---------- 기본 메뉴: OX 퀴즈 ----------
 var quizSt = { q: null, votes: {}, dollFront: false };
@@ -1492,7 +1492,7 @@ function seatEveryone() {
 }
 function seatEveryoneOne(r) { r.seat = { x: CX - 26, y: 98, jump: true, jx: CX - 26, jy: 116, stand: true, face: 0 }; }
 function setCeremony(on) {
-  if (on && officeOn) { officeOn = false; setTv(false); setTrack("carol"); for (const r of people) if (r.seat?.office || r.seat?.leave) r.seat = null; $("#presT").textContent = "송년회 참석 중"; $("#waitT").textContent = "아직 도착 전"; }
+  if (on && officeOn) { officeOn = false; setTv(false); setTrack("carol"); for (const r of people) if (r.seat?.office || r.seat?.leave) r.seat = null; document.body.classList.toggle("office", officeOn), $("#presT").textContent = "송년회 참석 중"; $("#waitT").textContent = "아직 도착 전"; }
   if (on === ceremony.on) return;
   ceremony.on = on;
   if (on) {

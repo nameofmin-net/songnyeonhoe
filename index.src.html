@@ -139,6 +139,9 @@
   .panel .qr img { width: 64px; height: 64px; background: #fff; padding: 3px; flex: none; image-rendering: pixelated; }
   .panel .qr span { font-size: 11px; color: #d8cfe8; line-height: 1.5; }
   .panel .qr b { display: block; font-size: 15px; color: var(--accent); margin-bottom: 2px; animation: qrb 1.6s ease-in-out infinite; }
+  /* 사옥 모드: LED 스크린에서도 찍히게 QR 크게 */
+  body.office .panel .qr { flex-direction: column; padding: 12px; gap: 8px; text-align: center; }
+  body.office #qrc { width: 200px !important; height: 200px !important; padding: 8px !important; }
   @keyframes qrb { 50% { opacity: .55; } }
   .panel.chat li.empty { flex-direction: column; }
   .panel.chat .ci { padding: 5px 2px; align-items: flex-start; }
