@@ -1038,7 +1038,7 @@ async function doShow(sh) {
   showCur = sh;
   if (sh.step === prev && !isNew) return;
   stepClass(sh.step);
-  if (sh.step >= 1 && prev < 1) { sfx.drumroll(0.7); await wait(80); startWalkers(); }
+  if (sh.step >= 1 && prev < 1) { sfx.drumroll(0.7); await wait(80); startWalkers(); setTimeout(() => coinBurst(showCard.querySelector(".sh-prize")), 900); }
   if (sh.step === 0) { cancelAnimationFrame(walkRaf); walkRaf = 0; walkers = []; showCard.querySelectorAll(".pp").forEach((e) => { e.classList.remove("here"); e.style.transform = ""; }); }
   if (sh.step === 2) { sfx.fanfare(); sfx.applause(3); confettiRain(); for (const id of sh.people) people.find((p) => p.d.id === id)?.emote("party"); }
 }
@@ -1050,7 +1050,7 @@ function uplHTML(sh) {
     <div class="up-p up-1"><div class="sh-t"><small>올해의 유플리더스</small>${esc(sh.title)}</div>${sh.desc ? `<p class="up-desc">${esc(sh.desc)}</p>` : ""}${sh.prizeOn && sh.prize ? `<div class="sh-prize">상금 : ${esc(sh.prize)}</div>` : ""}</div>
     <div class="up-p up-2"><div class="sh-t sm"><small>올해의 유플리더스</small>${esc(sh.title)}</div>
       <div class="ppl up-c">${cands.map((id) => `<div class="pp" data-id="${id}"><div class="bub"></div><div class="emo"></div><canvas width="${SW}" height="${SH}"></canvas><b>${esc(ALL[id].name)}${ALL[id].rank ? `<small>${ALL[id].rank}</small>` : ""}</b></div>`).join("")}</div>
-      <div class="spot"></div>
+      <div class="dimmer"></div><div class="cone"></div>
       <div class="up-win"><div class="sh-t"><small>올해의 유플리더스</small>${esc(sh.title)}</div><div class="up-frame"><canvas width="${SW}" height="${SH}"></canvas></div><div class="up-name">${w ? esc(w.name) : ""}${w?.rank ? `<small>${w.rank}</small>` : ""}</div>${sh.quote ? `<p class="up-desc">“${esc(sh.quote)}”</p>` : ""}</div></div>`;
 }
 // 후보들이 걸어 나와 줄지어 서면 → 스포트라이트가 사람들 사이를 오가다 수상자에서 멈춤 → 나머지 퇴장, 수상자 확대
@@ -1058,7 +1058,7 @@ let spotRaf = 0;
 function stopRace() { cancelAnimationFrame(spotRaf); spotRaf = 0; }
 async function startSpotlight(sh) {
   stopRace();
-  const panel = showCard.querySelector(".up-2"), spot = panel.querySelector(".spot");
+  const panel = showCard.querySelector(".up-2");
   showCard.style.setProperty("--ph", "20cqh"); showCard.style.setProperty("--pf", "2cqw");
   panel.classList.remove("done", "dark");
   startWalkers(true);
@@ -1067,28 +1067,31 @@ async function startSpotlight(sh) {
   await wait(1000 + els.length * 300 + 1600);
   if (!showCur || showCur.sid !== sh.sid || showCur.step !== 2) return;
   panel.classList.add("dark"); sfx.drumroll(3.2);
-  const pr = panel.getBoundingClientRect();
-  const cx = (el) => { const r = el.querySelector("canvas").getBoundingClientRect(); return [r.left + r.width / 2 - pr.left, r.top + r.height / 2 - pr.top]; };
+  const pr = panel.getBoundingClientRect(), cone = panel.querySelector(".cone");
+  const pos = (el) => { const r = el.querySelector("canvas").getBoundingClientRect(); return [r.left + r.width / 2 - pr.left, r.bottom - pr.top]; };
   const winIx = els.findIndex((e) => +e.dataset.id === sh.winner);
-  // 점점 느려지며 이리저리: 총 홉 수를 정하고 마지막이 수상자가 되게
-  const hops = 9 + els.length;
+  const hops = 6 + els.length;
   const seq = []; let cur = Math.floor(Math.random() * els.length);
   for (let i = 0; i < hops - 1; i++) { let nx; do nx = Math.floor(Math.random() * els.length); while (nx === cur); seq.push(nx); cur = nx; }
   if (seq[seq.length - 1] === winIx) seq.push((winIx + 1) % els.length);
   seq.push(winIx);
-  spot.style.opacity = 1;
+  const [, fy] = pos(els[0]);
+  cone.style.height = fy + 8 + "px";
+  cone.style.opacity = 1;
+  // 위에서 아래로 쏘는 원뿔 조명이 천천히 사람들을 훑고, 갈수록 더 느려진다
   for (let i = 0; i < seq.length; i++) {
-    const [x, y] = cx(els[seq[i]]), last = i === seq.length - 1;
-    const dur = 120 + Math.pow(i / seq.length, 2.4) * 650 + (last ? 400 : 0);
-    spot.style.transition = `transform ${dur}ms cubic-bezier(.22,1,.36,1)`;
-    spot.style.transform = `translate(${x}px, ${y}px)`;
-    sfx.blip();
-    await wait(dur + 40);
+    const [x] = pos(els[seq[i]]), last = i === seq.length - 1;
+    const dur = 420 + Math.pow(i / seq.length, 2) * 1300 + (last ? 700 : 0);
+    cone.style.transition = `transform ${dur}ms cubic-bezier(.45,0,.25,1)`;
+    cone.style.transform = `translateX(${x}px)`;
+    els.forEach((e) => e.classList.remove("lit"));
+    setTimeout(() => { els.forEach((e) => e.classList.remove("lit")); els[seq[i]].classList.add("lit"); sfx.blip(); }, dur * 0.8);
+    await wait(dur + (last ? 900 : 160));
     if (!showCur || showCur.step !== 2) return;
   }
   // 쾅! 수상자만 남기
   sfx.fanfare(); panel.classList.add("hit");
-  els.forEach((e, i) => { if (i !== winIx) e.classList.add("lose"); else e.classList.add("win"); });
+  els.forEach((e, i) => { if (i !== winIx) e.classList.add("lose"); else e.classList.add("win", "lit"); });
   await wait(1500);
   revealWinner(sh);
 }
@@ -1099,6 +1102,13 @@ function revealWinner(sh) {
   panel.classList.add("done");
   sfx.applause(3);
   people.find((p) => p.d.id === sh.winner)?.emote("party");
+}
+// 상금이 나올 때 동전이 팡 튄다
+function coinBurst(el) {
+  if (!el) return;
+  const box = document.createElement("div"); box.className = "coins";
+  box.innerHTML = Array.from({ length: 26 }, (_, i) => { const an = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, sp = 9 + Math.random() * 14; return `<i style="--x:${(Math.cos(an) * sp).toFixed(1)}cqw;--y:${(Math.sin(an) * sp * 1.6).toFixed(1)}cqh;--r:${Math.round(Math.random() * 720 - 360)}deg;animation-delay:${(i * 0.012).toFixed(3)}s"></i>`; }).join("");
+  el.appendChild(box); sfx.coins(); setTimeout(() => box.remove(), 1800);
 }
 function drawSpr(cv, id, dir, step, cache) {
   const img = spriteImage(styleOf(id), dir, step, cache);
@@ -1119,7 +1129,7 @@ async function doUpl(sh, isNew) {
   showCur = sh;
   if (sh.step === prev && !isNew) return;
   stepClass(sh.step);
-  if (sh.step === 1) { stopRace(); sfx.curtain(); }
+  if (sh.step === 1) { stopRace(); sfx.curtain(); setTimeout(() => coinBurst(showCard.querySelector(".up-1 .sh-prize")), 700); }
   if (sh.step === 2 && prev !== 3) startSpotlight(sh);
   if (sh.step === 3) { if (!showCard.querySelector(".up-2.done")) revealWinner(sh); sfx.fanfare(); sfx.applause(3); confettiRain(); }
 }
