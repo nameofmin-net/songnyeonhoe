@@ -153,7 +153,7 @@ const ROOT = { C: 48, D: 50, E: 52, F: 53, G: 55, A: 57, B: 59 };
 
 let bgmTimer = null, songIx = 0, nextT = 0, queue = [];
 function stopBgm() { clearInterval(bgmTimer); bgmTimer = null; queue.forEach((o) => { try { o.stop(); } catch {} }); queue = []; }
-function startBgm() { if (!bgmOn || bgmTimer || !ac) return; nextT = ac.currentTime + 0.3; scheduleSong(); bgmTimer = setInterval(() => { if (ac.currentTime > nextT - 2) scheduleSong(); }, 500); }
+function startBgm() { if (!bgmOn || bgmTimer || !ac || track === "none") return; nextT = ac.currentTime + 0.3; scheduleSong(); bgmTimer = setInterval(() => { if (ac.currentTime > nextT - 2) scheduleSong(); }, 500); }
 function voice(f, s, dur, type, vol, cut) {
   const o = ac.createOscillator(), g = ac.createGain(), fl = ac.createBiquadFilter();
   o.type = type; o.frequency.value = f; fl.type = "lowpass"; fl.frequency.value = cut;

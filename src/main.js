@@ -935,7 +935,7 @@ function setTv(on) {
   tvBox = document.createElement("div");
   Object.assign(tvBox.style, { position: "absolute", left: 8 * S + "px", top: 5 * S + "px", width: lw * S + "px", height: 32 * S + "px", overflow: "hidden", zIndex: 1, pointerEvents: "none", background: "#000" });
   const w = lw * S, h = w * 9 / 16;
-  tvBox.innerHTML = `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&modestbranding=1&playsinline=1&rel=0" allow="autoplay; encrypted-media" style="position:absolute;left:0;top:${(32 * S - h) / 2}px;width:${w}px;height:${h}px;border:0"></iframe>`;
+  tvBox.innerHTML = `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=0&loop=1&playlist=${id}&controls=0&modestbranding=1&playsinline=1&rel=0" allow="autoplay; encrypted-media" style="position:absolute;left:0;top:${(32 * S - h) / 2}px;width:${w}px;height:${h}px;border:0"></iframe>`;
   stage.appendChild(tvBox);
 }
 const OFFICE_LINES = {
@@ -968,7 +968,7 @@ function toggleOffice() {
     // 벽·소파 안에 갇힌 사람은 빈 자리로
     for (const r of people) { if (r.seat) continue; let k = 0; while (blocked(r.x, r.y) && k++ < 200) { r.x = rnd(20, W - 20); r.y = rnd(FLOOR_TOP + 14, H - 10); } }
     $("#presT").textContent = officeOn ? "출근한 사람" : "송년회 참석 중";
-    setTv(officeOn);
+    setTv(officeOn); setTrack(officeOn ? "none" : quizOn() ? "quiz" : "carol");
     $("#waitT").textContent = officeOn ? "아직 출근 전" : "아직 도착 전";
   }, 340);
 }
@@ -1304,7 +1304,7 @@ async function doUpl(sh, isNew) {
   if (sh.step === 2 && prev !== 3) startSpotlight(sh);
   if (sh.step === 3) { if (!showCard.querySelector(".up-2.done")) revealWinner(sh); sfx.fanfare(); sfx.applause(3); confettiRain(); }
 }
-function applyShow(sh) { setTrack(sh ? "award" : quizOn() ? "quiz" : "carol"); showChain = showChain.then(() => doShow(sh)).catch(() => {}); }
+function applyShow(sh) { if (sh && officeOn) toggleOffice(); setTrack(sh ? "award" : quizOn() ? "quiz" : "carol"); showChain = showChain.then(() => doShow(sh)).catch(() => {}); }
 
 // ---------- 기본 메뉴: OX 퀴즈 ----------
 var quizSt = { q: null, votes: {}, dollFront: false };
