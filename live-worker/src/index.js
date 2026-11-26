@@ -54,7 +54,7 @@ export class Room extends DurableObject {
     this.show = null;
     this.mode = null;
     this.quizQs = []; this.quiz = null; this.votes = new Map();
-    ctx.blockConcurrencyWhile(async () => { this.show = (await ctx.storage.get("show")) || null; this.mode = (await ctx.storage.get("mode")) || null; this.quizQs = (await ctx.storage.get("quizQs")) || []; this.quiz = (await ctx.storage.get("quiz")) || null; });
+    ctx.blockConcurrencyWhile(async () => { this.show = (await ctx.storage.get("show")) || null; this.mode = (await ctx.storage.get("mode")) || null; this.quizQs = (await ctx.storage.get("quizQs")) || []; this.quiz = (await ctx.storage.get("quiz")) || null; this.office = !!(await ctx.storage.get("office")); });
   }
   menus() {
     return this.ctx.storage.sql.exec("SELECT sid, name, title, sub, people, at, extra FROM menus ORDER BY sid").toArray().map(({ extra, ...m }) => ({ kind: "merit", ...JSON.parse(extra || "{}"), ...m, people: JSON.parse(m.people || "[]") }));
@@ -82,6 +82,7 @@ export class Room extends DurableObject {
       server.send(JSON.stringify({ type: "chatlog", items: this.chatlog() }));
       server.send(JSON.stringify({ type: "show", show: this.show }));
       server.send(JSON.stringify({ type: "mode", mode: this.mode }));
+      server.send(JSON.stringify({ type: "office", on: this.office }));
       server.send(JSON.stringify({ type: "quiz", quiz: this.quiz, votes: Object.fromEntries(this.votes) }));
       return new Response(null, { status: 101, webSocket: client });
     }
@@ -160,7 +161,7 @@ export class Room extends DurableObject {
       this.broadcast({ type: "vote", id, pick, idx: this.quiz.idx });
       return json(req, { ok: true });
     }
-    if (path.startsWith("/api/menu") || path === "/api/show" || path === "/api/mode" || path.startsWith("/api/quiz")) {
+    if (path.startsWith("/api/menu") || path === "/api/show" || path === "/api/mode" || path === "/api/office" || path === "/api/reload" || path.startsWith("/api/quiz")) {
       if (!this.admin(req)) return json(req, { error: "forbidden" }, 403);
       const txt = (v, n) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
       if (path === "/api/menus") return json(req, { ok: true, menus: this.menus(), show: this.show, mode: this.mode, quizQs: this.quizQs, quiz: this.quiz, votes: Object.fromEntries(this.votes) });
@@ -183,6 +184,13 @@ export class Room extends DurableObject {
         this.broadcast({ type: "quiz", quiz: this.quiz, votes: Object.fromEntries(this.votes) });
         return json(req, { ok: true, quiz: this.quiz });
       }
+      if (path === "/api/office") {
+        this.office = body.toggle ? !this.office : !!body.on;
+        await this.ctx.storage.put("office", this.office);
+        this.broadcast({ type: "office", on: this.office });
+        return json(req, { ok: true, on: this.office });
+      }
+      if (path === "/api/reload") { this.broadcast({ type: "reload" }); return json(req, { ok: true }); }
       // 기본 메뉴: 시상식 준비 모드(모두 앉아서 단상을 봄)
       if (path === "/api/mode") {
         this.mode = body.mode === "ceremony" ? "ceremony" : null;

@@ -1553,6 +1553,8 @@ connectLive({
   emote: onEmote,
   show: applyShow,
   mode: (m) => setCeremony(m === "ceremony"),
+  office: (on) => { if (!!on !== officeOn) toggleOffice(); },
+  reload: () => location.reload(),
   quiz: (q, v) => applyQuiz(q, v),
   vote: onVote,
   status: (on) => { online = on; const el = $("#live"); el.textContent = on ? "● 실시간 연결됨" : "○ 연결 중…"; el.className = on ? "on" : ""; },

@@ -64,6 +64,8 @@ export function connectLive(h) {
       else if (m.type === "update") { setOverride(m.id, m.style); h.update?.(m); }
       else if (m.type === "cheers") h.cheers?.();
       else if (m.type === "reset") h.reset?.();
+      else if (m.type === "office") h.office?.(m.on);
+      else if (m.type === "reload") h.reload?.();
       else if (m.type === "chatlog") h.chatlog?.(m.items || []);
       else if (m.type === "chat") h.chat?.(m);
       else if (m.type === "emote") h.emote?.(m);
@@ -207,7 +209,7 @@ button:disabled { opacity: .45; filter: grayscale(.6); cursor: default; }
 .qz-btns button:disabled { opacity: .35; } .qz-btns button.ans { opacity: 1; outline: 5px solid #5ae08a; }
 .qz-st { font-size: 15px; min-height: 1.4em; } .qz-st .ok { color: #1a8a3a; font-size: 20px; } .qz-st .ng { color: #c81e2a; font-size: 20px; }
 .qz-end { font-size: 22px; line-height: 1.6; } .qz-end small { font-size: 14px; color: #6a5a4a; }
-.mob-admin { display: flex; gap: 6px; padding: 6px 10px; border-bottom: 1px solid #ffffff14; }
+.mob-admin { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px 10px; border-bottom: 1px solid #ffffff14; }
 .mob-admin .btn { flex: 1; padding: 8px 6px; font-size: 13px; }
 .mob-head .btn.ctl-btn { padding: 6px 10px; font-size: 20px; }
 .mob-chat { flex: 1; overflow-y: auto; padding: 8px 10px; list-style: none; margin: 0; }
@@ -366,7 +368,7 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
             ${id === ADMIN_ID && onController ? `<button class="btn ctl-btn" data-act="ctl">🎮</button>` : ""}
             <button class="btn sub" data-act="edit">캐릭터 수정</button>
           </header>
-          ${id === ADMIN_ID ? `<div class="mob-admin"><button class="btn sub" data-act="rand">🎲 랜덤 5명 입장</button><button class="btn sub" data-act="wipe">💥 광장 초기화</button></div>` : ""}
+          ${id === ADMIN_ID ? `<div class="mob-admin"><button class="btn sub" data-act="rand">🎲 랜덤 5명 입장</button><button class="btn sub" data-act="wipe">💥 광장 초기화</button><button class="btn sub" data-act="office">🏢 사옥⇄광장</button><button class="btn sub" data-act="reload">🔄 새로고침</button></div>` : ""}
           <div class="mob-quiz" hidden></div>
           <ul class="mob-chat"></ul>
           <div class="mob-emo">${EMOTES.map(([k, e, l]) => `<button type="button" data-emo="${k}"><i>${e}</i>${l}</button>`).join("")}</div>
@@ -427,6 +429,8 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
         if (act === "ctl") { onController(); return; }
         if (act === "rand") { adminRandom(entries); return; }
         if (act === "wipe") { adminWipe(id); return; }
+        if (act === "office") { adminSignal("/api/office", { toggle: true }); return; }
+        if (act === "reload") { if (confirm("🔄 광장 모니터 화면을 새로고침할까요?\n(참가자 휴대폰은 그대로예요)")) adminSignal("/api/reload", {}); return; }
         if (act === "edit") { sheet.hidden = false; sheet.scrollTop = 0; }
         if (act === "close") { sheet.hidden = true; root.querySelector(".mob-av").src = avatarURL(id, 2); }
       });
@@ -567,4 +571,10 @@ if (typeof document !== "undefined") {
   document.addEventListener("pointerup", up, true);
   document.addEventListener("pointercancel", up, true);
   document.addEventListener("pointermove", (e) => { if (!held) return; const r = held.getBoundingClientRect(); if (e.clientX < r.left - 8 || e.clientX > r.right + 8 || e.clientY < r.top - 8 || e.clientY > r.bottom + 8) { held.classList.remove("down"); held = null; } }, true);
+}
+
+async function adminSignal(path, body) {
+  let key = adminKey.get();
+  if (!key) { key = (prompt("관리자 코드를 입력하세요.") || "").trim(); if (!key) return; adminKey.set(key); }
+  try { await adminPost(path, body); } catch (e) { if (e.message === "forbidden") adminKey.set(""); alert(e.message === "forbidden" ? "관리자 코드가 맞지 않아요." : "전송에 실패했어요."); }
 }
