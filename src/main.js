@@ -341,7 +341,17 @@ class Resident {
   }
   /** 시상식 준비: 자리로 걸어가서 앉아(또는 서서) 단상을 본다 */
   seatLogic(dt) {
-    const s = this.seat, dx = s.x - this.x, dy = s.y - this.y, d = Math.hypot(dx, dy);
+    const s = this.seat;
+    // 경유지(탕비실 출입구 등)를 먼저 지난다
+    if (s.via && s.via.length) {
+      const v = s.via[0], ex = v.x - this.x, ey = v.y - this.y, e = Math.hypot(ex, ey);
+      if (e < 2) { s.via.shift(); return; }
+      this.state = "walk"; const sp = this.speed * 1.5;
+      this.x += (ex / e) * Math.min(sp * dt, e); this.y += (ey / e) * Math.min(sp * dt, e);
+      if (Math.abs(ex) > Math.abs(ey) * 0.9) { this.dir = 2; this.flip = ex < 0; } else this.dir = ey > 0 ? 0 : 1;
+      return;
+    }
+    const dx = s.x - this.x, dy = s.y - this.y, d = Math.hypot(dx, dy);
     if (s.jump && d > 1.5 && d < 40) {
       // 단상 앞에 오면 폴짝 올라간다
       this.x = s.x; this.y = s.y; this.hop = 0.7; this.say(choose(CEO_LINES), 4); return;
@@ -357,7 +367,22 @@ class Resident {
       return;
     }
     if (s.flee) { this.zapped = true; this.seat = null; return; }
+    if (s.leave) { this.seat = null; this.state = "idle"; this.timer = rnd(0.5, 2); return; }
     this.x = s.x; this.y = s.y;
+    if (s.office) {
+      if (!s.said) { s.said = true; this.state = s.stand ? "idle" : "sit"; this.dir = s.face ?? 1; this.flip = !!s.flip; this.say(choose(OFFICE_LINES[s.kind].hi), 4); if (s.kind === "coffee" || s.kind === "water") this.react(); }
+      s.t = (s.t || 0) + dt;
+      if (s.t > s.stay) { // 일어나서 떠난다(탕비실이면 출입구로)
+        const inK = s.kind === "bar" || s.kind === "coffee" || s.kind === "water";
+        this.seat = inK ? { x: OFFICE.doorOut.x, y: OFFICE.doorOut.y, stand: true, leave: true, via: [{ ...OFFICE.doorIn }] } : null;
+        if (!inK) { this.state = "idle"; this.timer = rnd(0.5, 2); this.y += 4; }
+        if (Math.random() < 0.5) this.say(choose(OFFICE_LINES[s.kind].bye), 2.6);
+        return;
+      }
+      this.state = s.stand ? "idle" : "sit"; this.dir = s.face ?? 1; this.flip = !!s.flip;
+      if (Math.random() < dt * 0.05) this.say(choose(OFFICE_LINES[s.kind].mid), 3.2);
+      return;
+    }
     if (this.state === "walk") { this.state = s.stand ? "idle" : "sit"; this.timer = 0; }
     if (this.dance > 0) return;
     if (this.timer > 0) { this.timer -= dt; return; }
@@ -899,6 +924,25 @@ const treeFromRow = () => (tree.gone ? bigTree.h : tree.boom < 0 ? 0 : Math.ceil
 // ---------- 이스터에그: 단상 뒤 출입문 더블클릭 → 유플리트 사옥 ⇄ 광장 ----------
 officeScene = null;
 const OFFICE = officeLayout(W, H);
+const OFFICE_LINES = {
+  sofa: { hi: ["아 푹신하다~", "여기 명당이네요", "잠깐 쉬었다 갈게요 😌", "이 소파 진짜 편해"], mid: ["쿠션 색 예쁘다", "5분만 눈 붙일까…", "여기서 회의해도 되겠다", "올해 진짜 바빴죠?"], bye: ["자, 다시 일하러!", "충전 완료 💪"] },
+  bar: { hi: ["간식 뭐 있어요?", "여기 앉아도 되죠?", "오늘 저녁 뭐 먹지?"], mid: ["과자 하나만 먹을게요 🍪", "이 테이블 원목 좋다", "내년 워크숍 어디 가요?", "수다 타임 ☕"], bye: ["잘 먹었습니다!", "이제 들어가 볼게요"] },
+  coffee: { hi: ["커피 한 잔 하실 분? ☕", "아아 수혈 중…", "샷 추가 필수"], mid: ["원두 바뀌었나?", "커피 없인 못 살아"], bye: ["카페인 충전 완료!"] },
+  water: { hi: ["물 마시러 왔어요 💧", "정수기 물 시원하다"], mid: ["하루 2리터 목표"], bye: ["수분 보충 끝!"] },
+};
+// 사옥 모드: 몇 초마다 한 명씩 소파·바 테이블·커피머신으로 가서 앉거나 머문다
+setInterval(() => {
+  if (!officeOn || ceremony?.on || quizVis) return;
+  const used = people.filter((p) => p.seat?.office);
+  if (used.length >= Math.min(OFFICE.seats.length, Math.ceil(people.length * 0.4))) return;
+  const free = OFFICE.seats.filter((q) => !used.some((p) => p.seat.x === q.x && p.seat.y === q.y));
+  const cand = people.filter((p) => !p.seat && !p.d.npc && p.entering === undefined && (p.state === "walk" || p.state === "idle"));
+  if (!free.length || !cand.length) return;
+  const r = choose(cand), q = choose(free), inK = q.kind !== "sofa";
+  const outside = r.x > OFFICE.K.x1 || r.y < OFFICE.K.y0;
+  r.seat = { ...q, office: true, stand: !!q.stand, stay: rnd(9, 20), via: inK && outside ? [{ ...OFFICE.doorOut }, { ...OFFICE.doorIn }] : undefined };
+  r.timer = 0;
+}, 1800);
 const officeProps = [{ spr: bigTree, x: OFFICE.tree.x, y: OFFICE.tree.y }];
 function toggleOffice() {
   if (!officeScene) officeScene = buildOfficeBg(W, H, CX, FY, FLOOR_TOP);
@@ -906,6 +950,7 @@ function toggleOffice() {
   cv.animate([{ filter: "brightness(1)" }, { filter: "brightness(0)", offset: 0.45 }, { filter: "brightness(0)", offset: 0.55 }, { filter: "brightness(1)" }], { duration: 700, easing: "ease-in-out" });
   setTimeout(() => {
     officeOn = !officeOn;
+    for (const r of people) if (r.seat && (r.seat.office || r.seat.leave)) { r.seat = null; r.state = "idle"; r.timer = rnd(0.3, 1.5); }
     // 벽·소파 안에 갇힌 사람은 빈 자리로
     for (const r of people) { if (r.seat) continue; let k = 0; while (blocked(r.x, r.y) && k++ < 200) { r.x = rnd(20, W - 20); r.y = rnd(FLOOR_TOP + 14, H - 10); } }
     $("#presT").textContent = officeOn ? "출근한 사람" : "송년회 참석 중";
@@ -1408,7 +1453,7 @@ function seatEveryone() {
 }
 function seatEveryoneOne(r) { r.seat = { x: CX - 26, y: 98, jump: true, jx: CX - 26, jy: 116, stand: true, face: 0 }; }
 function setCeremony(on) {
-  if (on && officeOn) { officeOn = false; $("#presT").textContent = "송년회 참석 중"; $("#waitT").textContent = "아직 도착 전"; }
+  if (on && officeOn) { officeOn = false; for (const r of people) if (r.seat?.office || r.seat?.leave) r.seat = null; $("#presT").textContent = "송년회 참석 중"; $("#waitT").textContent = "아직 도착 전"; }
   if (on === ceremony.on) return;
   ceremony.on = on;
   if (on) {
