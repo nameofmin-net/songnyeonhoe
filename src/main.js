@@ -1568,7 +1568,7 @@ if (params.has("debug")) window.__plaza = { get people() { return people; }, sty
 // 입장 QR: 이미지 대신 캔버스에 직접 그린다(TV·크롬캐스트 브라우저 호환)
 (function drawQR() {
   const c = document.getElementById("qrc"); if (!c) return;
-  const n = QR.length, q = 2, k = Math.floor(256 / (n + q * 2));
+  const n = QR.length, q = 3, k = Math.floor(256 / (n + q * 2));
   c.width = c.height = k * (n + q * 2);
   const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.fillStyle = "#000";
   QR.forEach((row, y) => { for (let x = 0; x < n; x++) if (row[x] === "1") g.fillRect((x + q) * k, (y + q) * k, k, k); });
