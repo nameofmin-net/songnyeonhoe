@@ -38,14 +38,14 @@ export function officeLayout(W, H) {
   for (let i = 0; i < 3; i++) { const sx = K.bx0 + 9 + Math.round(i * (tw - 18) / 2); seats.push({ x: sx, y: K.by0 - 5, face: 0, kind: "bar" }, { x: sx, y: K.by0 + 29, face: 1, kind: "bar" }); }
   seats.push({ x: 62, y: K.y0 + 38, face: 1, stand: true, kind: "coffee" }, { x: 32, y: K.y0 + 38, face: 1, stand: true, kind: "water" });
   // 오른쪽 아래 업무 테이블: 세로로 긴 대형 테이블 3개, 좌3·우3 마주 앉기
-  const D = [], tw2 = 20, th2 = 64, rx0 = Math.round(W * 0.53), rx1 = W - 12, ty = Math.round(H * 0.7);
+  const D = [], tw2 = 30, th2 = 96, rx0 = Math.round(W * 0.52), rx1 = W - 8, ty = Math.round(H * 0.655);
   const span = (rx1 - rx0) / 3;
   for (let i = 0; i < 3; i++) D.push({ x: Math.round(rx0 + span * (i + 0.5) - tw2 / 2), y: ty, w: tw2, h: th2 });
   for (const d of D) {
     blocks.push([d.x - 1, d.y - 2, d.x + d.w + 1, d.y + d.h + 1]);
     for (let k = 0; k < 3; k++) {
-      const yy = d.y + 14 + k * 20;
-      seats.push({ x: d.x - 8, y: yy, face: 2, flip: false, kind: "desk" }, { x: d.x + d.w + 8, y: yy, face: 2, flip: true, kind: "desk" });
+      const yy = d.y + 22 + k * 30;
+      seats.push({ x: d.x - 10, y: yy, face: 2, flip: false, kind: "desk" }, { x: d.x + d.w + 10, y: yy, face: 2, flip: true, kind: "desk" });
     }
   }
   const doorIn = { x: Math.round((K.cw + K.x1) / 2), y: K.y0 + 14 }, doorOut = { x: Math.round((K.cw + K.x1) / 2), y: K.y0 - 12 };
@@ -177,13 +177,13 @@ export function buildOfficeBg(W, H, CX, FY, FLOOR_TOP) {
     p.rect(d.x, d.y, d.w, d.h, C("#fafaf8")); p.rect(d.x, d.y, d.w, 1, C("#ffffff")); p.rect(d.x, d.y + d.h - 1, d.w, 1, C("#c4c2bc")); p.rect(d.x + d.w - 1, d.y, 1, d.h, C("#d8d6d0"));
     p.rect(mid - 1, d.y + 1, 2, d.h - 2, C("#b8bcc2"));
     for (let k = 0; k < 3; k++) {
-      const yy = d.y + 4 + k * 20;
-      p.rect(mid - 5, yy, 3, 10, C("#1c1c22")); p.rect(mid - 5, yy + 1, 1, 8, C("#4a7fd4")); // 왼쪽 사람 모니터
-      p.rect(mid + 2, yy, 3, 10, C("#1c1c22")); p.rect(mid + 4, yy + 1, 1, 8, C("#4a7fd4")); // 오른쪽 사람 모니터
-      p.rect(d.x + 1, yy + 3, 2, 5, C("#e2e2e4")); p.rect(d.x + d.w - 3, yy + 3, 2, 5, C("#e2e2e4")); // 키보드
+      const yy = d.y + 8 + k * 30;
+      p.rect(mid - 6, yy, 3, 12, C("#1c1c22")); p.rect(mid - 6, yy + 1, 1, 10, C("#4a7fd4")); // 왼쪽 사람 모니터
+      p.rect(mid + 3, yy, 3, 12, C("#1c1c22")); p.rect(mid + 5, yy + 1, 1, 10, C("#4a7fd4")); // 오른쪽 사람 모니터
+      p.rect(d.x + 3, yy + 3, 3, 7, C("#e2e2e4")); p.rect(d.x + d.w - 6, yy + 3, 3, 7, C("#e2e2e4")); // 키보드
       if (k === 1) { p.rect(d.x + 3, yy + 10, 2, 2, C("#ffffff")); p.rect(d.x + d.w - 5, yy - 2, 2, 2, C("#e8b44a")); } // 머그
-      for (const [cx, side] of [[d.x - 7, -1], [d.x + d.w + 6, 1]]) {
-        p.rect(cx - 3, yy + 2, 7, 8, C("#e4e4e6")); p.rect(side < 0 ? cx - 4 : cx + 3, yy + 1, 2, 10, C("#c8c8cc"));
+      for (const [cx, side] of [[d.x - 9, -1], [d.x + d.w + 8, 1]]) {
+        p.rect(cx - 4, yy + 2, 9, 10, C("#e4e4e6")); p.rect(side < 0 ? cx - 5 : cx + 4, yy + 1, 2, 12, C("#c8c8cc"));
       }
     }
     p.glow(mid, d.y + d.h / 2, 26, C("#cfe0ff"), 0.06);

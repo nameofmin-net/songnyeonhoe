@@ -935,8 +935,17 @@ function setTv(on) {
   tvBox = document.createElement("div");
   Object.assign(tvBox.style, { position: "absolute", left: 8 * S + "px", top: 5 * S + "px", width: lw * S + "px", height: 32 * S + "px", overflow: "hidden", zIndex: 1, pointerEvents: "none", background: "#000" });
   const w = lw * S, h = w * 9 / 16;
-  tvBox.innerHTML = `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=0&loop=1&playlist=${id}&controls=0&modestbranding=1&playsinline=1&rel=0" allow="autoplay; encrypted-media" style="position:absolute;left:0;top:${(32 * S - h) / 2}px;width:${w}px;height:${h}px;border:0"></iframe>`;
+  // 픽셀 필터(SVG): 블록 하나 = 월드 픽셀 1칸 → 광장과 같은 도트감
+  const B = Math.max(2, Math.round(S)), hB = B / 2;
+  const svg = `<svg width="0" height="0" style="position:absolute"><filter id="tvpx" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feFlood x="${hB}" y="${hB}" width="1" height="1"/><feComposite width="${B}" height="${B}"/><feTile result="a"/><feComposite in="SourceGraphic" in2="a" operator="in"/><feMorphology operator="dilate" radius="${Math.ceil(hB)}"/></filter></svg>`;
+  tvBox.innerHTML = svg + `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=0&loop=1&playlist=${id}&controls=0&modestbranding=1&playsinline=1&rel=0" allow="autoplay; encrypted-media" style="position:absolute;left:0;top:${(32 * S - h) / 2}px;width:${w}px;height:${h}px;border:0"></iframe>`;
   stage.appendChild(tvBox);
+  // 교차 출처 영상엔 픽셀 필터가 안 먹어서, LED 전광판처럼 도트 격자를 덮는다
+  const grid = document.createElement("div");
+  Object.assign(grid.style, { position: "absolute", inset: 0, pointerEvents: "none",
+    backgroundImage: `linear-gradient(to right, rgba(10,8,16,.55) 1px, transparent 1px), linear-gradient(to bottom, rgba(10,8,16,.55) 1px, transparent 1px), radial-gradient(circle at 50% 50%, transparent 55%, rgba(10,8,16,.35) 100%)`,
+    backgroundSize: `${B}px ${B}px, ${B}px ${B}px, ${B}px ${B}px` });
+  tvBox.appendChild(grid);
 }
 const OFFICE_LINES = {
   sofa: { hi: ["아 푹신하다~", "여기 명당이네요", "잠깐 쉬었다 갈게요 😌", "이 소파 진짜 편해"], mid: ["쿠션 색 예쁘다", "5분만 눈 붙일까…", "여기서 회의해도 되겠다", "올해 진짜 바빴죠?"], bye: ["자, 다시 일하러!", "충전 완료 💪"] },
