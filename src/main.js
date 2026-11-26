@@ -13,11 +13,14 @@ import * as beer from "./beer.js";
 import * as transform from "./transform.js";
 import { drawSpecial, floatOf } from "./special.js";
 import { createCurtain } from "./curtain.js";
-import { buildQuizBg, drawDoll, WALL, O_ZONE, X_ZONE } from "./quiz.js";
+import { buildQuizBg, drawDoll, WALL, O_ZONE, X_ZONE, setQuizW } from "./quiz.js";
 import { sfx, setSound, soundOn, savedPref, setTrack } from "./audio.js";
 import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf, chatItemHTML } from "./joinform.js";
 
-const W = 480, H = 360;
+const H = 360;
+// 광장 가로폭은 화면에 맞춰 정한다: 좌우 패널(236+300) 고정, 남는 공간을 광장이 꽉 채움
+const W = (() => { const aw = innerWidth - 24 - 236 - 300 - 24, ah = innerHeight - 20; if (innerWidth < 1000) return 640; return Math.max(400, Math.min(760, Math.round((H * aw / ah) / 2) * 2)); })();
+setQuizW(W);
 const CX = W / 2, FY = 216; // 광장 중심(대형 트리)
 const params = new URLSearchParams(location.search);
 // 휴대폰에서는 광장 대신 입장(채팅) 페이지로
@@ -42,13 +45,15 @@ function resize() {
   stage.style.width = cw + "px"; stage.style.height = ch + "px";
   document.getElementById("row").style.height = wide ? ch + "px" : "";
   // 화면이 16:9보다 넓으면 남는 가로폭을 양옆 패널이 나눠 가져 여백을 없앤다
-  const extra = wide ? Math.max(0, innerWidth - 24 - side - cw) : 0;
+  const extra = 0;
   const L = document.querySelector(".col.left"), R = document.querySelector(".col.right");
   if (L && R) { L.style.width = wide ? 236 + Math.floor(extra * 0.44) + "px" : ""; R.style.width = wide ? 300 + Math.floor(extra * 0.56) + "px" : ""; }
   dpr = devicePixelRatio || 1;
   ov.width = Math.round(cw * dpr); ov.height = Math.round(ch * dpr);
 }
 addEventListener("resize", resize);
+// 창 비율이 크게 바뀌면 광장을 새 폭으로 다시 짓는다(명단·채팅은 서버에서 다시 받아옴)
+let rzT; addEventListener("resize", () => { clearTimeout(rzT); rzT = setTimeout(() => { const aw = innerWidth - 584, ah = innerHeight - 20; const want = innerWidth < 1000 ? 640 : Math.max(400, Math.min(760, Math.round((H * aw / ah) / 2) * 2)); if (Math.abs(want - W) > 16) location.reload(); }, 700); });
 resize();
 
 // ---------- 배경 ----------
@@ -161,9 +166,9 @@ function addProp(spr, x, y, block, glow) {
   }
 }
 function buildProps() {
-  for (const [x, y] of [[CX - 190, 140], [CX + 190, 140], [CX - 190, 312], [CX + 190, 312]]) addProp(lampSpr, x, y, [x - 4, y - 3, x + 4, y + 2], [x, y - 38, 46, "#ffcf80", 0.45]);
-  for (const [x, y] of [[CX - 150, 82], [CX + 150, 82], [56, 200], [W - 56, 200]]) addProp(benchSpr, x, y, [x - 20, y - 6, x + 20, y + 2]);
-  for (const [x, y] of [[36, 100], [W - 36, 100], [CX - 175, 344], [CX + 175, 344]]) addProp(treeSpr, x, y, [x - 14, y - 6, x + 14, y + 3]);
+  for (const [x, y] of [[Math.round(CX - W * 0.4), 140], [Math.round(CX + W * 0.4), 140], [Math.round(CX - W * 0.4), 312], [Math.round(CX + W * 0.4), 312]]) addProp(lampSpr, x, y, [x - 4, y - 3, x + 4, y + 2], [x, y - 38, 46, "#ffcf80", 0.45]);
+  for (const [x, y] of [[Math.round(CX - W * 0.31), 82], [Math.round(CX + W * 0.31), 82], [56, 200], [W - 56, 200]]) addProp(benchSpr, x, y, [x - 20, y - 6, x + 20, y + 2]);
+  for (const [x, y] of [[36, 100], [W - 36, 100], [Math.round(CX - W * 0.36), 344], [Math.round(CX + W * 0.36), 344]]) addProp(treeSpr, x, y, [x - 14, y - 6, x + 14, y + 3]);
   for (const [x, y] of [[CX - 110, 262], [CX + 110, 262], [CX - 88, 108], [CX + 88, 108], [CX, 336]]) addProp(potSpr, x, y, [x - 8, y - 4, x + 8, y + 2]);
   // 12시 방향 단상
   addProp(podium, CX, 104, [CX - 76, 44, CX + 76, 108], [CX, 70, 60, "#fff0c0", 0.25]);

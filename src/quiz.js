@@ -5,6 +5,7 @@ const C = hex;
 const h2 = (x, y) => { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 export const WALL = 118; // 담장 아래 끝(여기부터 운동장)
 export const O_ZONE = { x: 122, y: 252, r: 70 }, X_ZONE = { x: 358, y: 252, r: 70 };
+export function setQuizW(W) { const r = Math.min(78, Math.round(W * 0.15)); O_ZONE.x = Math.round(W * 0.26); X_ZONE.x = W - O_ZONE.x; O_ZONE.r = X_ZONE.r = r; }
 
 export function buildQuizBg(W, H) {
   const f = createFrame(W, H), p = painterFor(f);
