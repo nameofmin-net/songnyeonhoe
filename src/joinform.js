@@ -183,6 +183,7 @@ const CSS = `
 .mob-head .who small { font-size: 11px; color: #9a90b0; }
 .mob-head .btn { padding: 8px 12px; font-size: 13px; }
 .mob-quiz { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 20px 16px; text-align: center; background: #e8d6b0; color: #3a2a1a; }
+.mob-quiz[hidden] { display: none; }
 .mob.quizzing .mob-chat, .mob.quizzing .mob-in { display: none; }
 .qz-n { font-size: 14px; color: #c8327a; letter-spacing: .1em; }
 .qz-q { font-size: 22px; line-height: 1.5; word-break: keep-all; color: #1c1624; }
@@ -372,8 +373,8 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
         qbox.hidden = !q;
         if (!q) return;
         if (q.phase === "end") { qbox.innerHTML = `<div class="qz-end">🏁 모든 문제가 끝났어요!<br><small>광장 화면을 봐 주세요</small></div>`; return; }
-        const pick = myPick[q.idx], rev = q.phase === "reveal";
-        const res = rev ? (pick ? (pick === q.a ? `<b class="ok">⭕ 정답! 살아남았어요 🎉</b>` : `<b class="ng">탈락… 💀</b>`) : `<b class="ng">투표 안 했어요</b>`) : pick ? `${pick} 쪽으로 이동했어요` : "O 또는 X를 골라 주세요";
+        const pick = myPick[q.idx], out = (q.out || []).includes(id) && !(q.phase === "reveal" && pick), rev = q.phase === "reveal" || out;
+        const res = out ? `<b class="ng">탈락했어요 💀 구경 모드</b>` : rev ? (pick ? (pick === q.a ? `<b class="ok">⭕ 정답! 살아남았어요 🎉</b>` : `<b class="ng">탈락… 💀</b>`) : `<b class="ng">투표 안 했어요</b>`) : pick ? `${pick} 쪽으로 이동했어요` : "O 또는 X를 골라 주세요";
         qbox.innerHTML = `<div class="qz-n">Q${q.idx + 1}${q.total ? ` / ${q.total}` : ""}</div><div class="qz-q">${esc(q.q)}</div>
           <div class="qz-btns"><button data-pick="O" class="o ${pick === "O" ? "on" : ""} ${rev && q.a === "O" ? "ans" : ""}" ${rev ? "disabled" : ""}>O</button><button data-pick="X" class="x ${pick === "X" ? "on" : ""} ${rev && q.a === "X" ? "ans" : ""}" ${rev ? "disabled" : ""}>X</button></div>
           <div class="qz-st">${res}</div>`;

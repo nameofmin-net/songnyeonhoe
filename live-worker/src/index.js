@@ -153,6 +153,7 @@ export class Room extends DurableObject {
     if (path === "/api/quiz/vote") {
       const id = Number(body.id), pick = body.pick === "O" || body.pick === "X" ? body.pick : null;
       if (!pick || !this.quiz || this.quiz.phase !== "ask") return json(req, { error: "closed" }, 409);
+      if ((this.quiz.out || []).includes(id)) return json(req, { error: "out" }, 403);
       if (!this.ctx.storage.sql.exec("SELECT id FROM att WHERE id = ?", id).toArray().length) return json(req, { error: "not joined" }, 403);
       if (this.votes.get(id) === pick) return json(req, { ok: true });
       this.votes.set(id, pick);
@@ -170,11 +171,11 @@ export class Room extends DurableObject {
       }
       if (path === "/api/quiz/ctl") {
         const act = String(body.action || ""), n = this.quizQs.length;
-        const ask = (idx) => { this.votes = new Map(); this.quiz = { on: true, idx, total: n, phase: "ask", q: this.quizQs[idx].q, at: Date.now() }; };
-        if (act === "start") { if (!n) return json(req, { error: "no questions" }, 400); ask(0); }
-        else if (act === "reveal" && this.quiz) { const qq = this.quizQs[this.quiz.idx]; const c = { O: 0, X: 0 }; for (const v of this.votes.values()) c[v]++; this.quiz = { ...this.quiz, phase: "reveal", a: qq ? qq.a : "O", counts: c }; }
-        else if (act === "next" && this.quiz) { if (this.quiz.idx + 1 >= n) this.quiz = { ...this.quiz, phase: "end" }; else ask(this.quiz.idx + 1); }
-        else if (act === "goto" && this.quiz) { const i = Number(body.idx); if (i >= 0 && i < n) ask(i); }
+        const ask = (idx, out) => { this.votes = new Map(); this.quiz = { on: true, idx, total: n, phase: "ask", q: this.quizQs[idx].q, out, at: Date.now() }; };
+        if (act === "start") { if (!n) return json(req, { error: "no questions" }, 400); ask(0, []); }
+        else if (act === "reveal" && this.quiz) { const qq = this.quizQs[this.quiz.idx]; const c = { O: 0, X: 0 }; for (const v of this.votes.values()) c[v]++; const ans = qq ? qq.a : "O", out = new Set(this.quiz.out || []); for (const [k, v] of this.votes) if (v !== ans) out.add(k); this.quiz = { ...this.quiz, phase: "reveal", a: ans, counts: c, out: [...out] }; }
+        else if (act === "next" && this.quiz) { if (this.quiz.idx + 1 >= n) this.quiz = { ...this.quiz, phase: "end" }; else ask(this.quiz.idx + 1, this.quiz.out || []); }
+        else if (act === "goto" && this.quiz) { const i = Number(body.idx); if (i >= 0 && i < n) ask(i, this.quiz.out || []); }
         else if (act === "stop") { this.quiz = null; this.votes = new Map(); }
         await this.ctx.storage.put("quiz", this.quiz);
         this.broadcast({ type: "quiz", quiz: this.quiz, votes: Object.fromEntries(this.votes) });

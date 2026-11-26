@@ -243,7 +243,7 @@ class Resident {
   sprite(dir, step, blink) {
     const k = dir * 10 + step + (blink ? 5 : 0);
     let s = this.cache.get(k);
-    if (!s) this.cache.set(k, (s = renderSprite(quizOn() ? { ...this.style, sp: "track" } : this.style, dir, step, blink)));
+    if (!s) this.cache.set(k, (s = renderSprite(quizVis ? { ...this.style, sp: "track" } : this.style, dir, step, blink)));
     return s;
   }
   get busy() { return this.state === "chat" || this.state === "ride" || this.fx.some((f) => f.loop); }
@@ -333,13 +333,14 @@ class Resident {
     if (d > 1.5) {
       if (this.timer > 0 && this.state !== "walk") { this.timer -= dt; return; } // 감정표현 중엔 잠깐 멈춤
       const tx = s.jump ? s.jx : s.x, ty = s.jump ? s.jy : s.y, ex = tx - this.x, ey = ty - this.y, e = Math.max(0.001, Math.hypot(ex, ey));
-      const sp = this.speed * 1.5;
+      const sp = this.speed * (s.fast ? 4.2 : 1.5);
       if (e < 1.5 && s.jump) { this.x = s.x; this.y = s.y; this.hop = 0.7; this.say(choose(CEO_LINES), 4); return; }
       this.state = "walk";
       this.x += (ex / e) * Math.min(sp * dt, e); this.y += (ey / e) * Math.min(sp * dt, e);
       if (Math.abs(ex) > Math.abs(ey) * 0.9) { this.dir = 2; this.flip = ex < 0; } else this.dir = ey > 0 ? 0 : 1;
       return;
     }
+    if (s.flee) { this.zapped = true; this.seat = null; return; }
     this.x = s.x; this.y = s.y;
     if (this.state === "walk") { this.state = s.stand ? "idle" : "sit"; this.timer = 0; }
     if (this.dance > 0) return;
@@ -508,7 +509,7 @@ function drawOverlay() {
   const nameF = Math.round(small * 1.3), talkF = Math.round(small * 1.5);
 
   // 현수막(퀴즈 운동장에선 숨김)
-  if (!quizOn()) {
+  if (!quizVis) {
     const cx = CX * S, cy = 30 * S;
     c.font = `bold ${big}px Galmuri14, "Apple SD Gothic Neo", sans-serif`;
     const t = "🎉 2026 U PLEAT 송년회 🎉", tw = c.measureText(t).width + 24;
@@ -522,7 +523,7 @@ function drawOverlay() {
   for (const r of list) {
     if (r.hidden || r.zapped || r.state === "ride" || r.state === "sit") continue;
     const x = r.x * S, y = (r.y + 3) * S + nameF * 0.6;
-    const label = quizOn() && !r.d.npc ? `${String(r.d.id + 1).padStart(3, "0")} ${r.name}` : r.name;
+    const label = quizVis && !r.d.npc ? `${String(r.d.id + 1).padStart(3, "0")} ${r.name}` : r.name;
     const tw = c.measureText(label).width + 10;
     c.fillStyle = "rgba(20,14,30,0.72)";
     c.fillRect(Math.round(x - tw / 2), Math.round(y - nameF * 0.62), Math.round(tw), Math.round(nameF * 1.3));
@@ -706,7 +707,7 @@ function tick(nowMs) {
   chats();
 
   frame.color.fill(0); frame.light.set(staticLight);
-  const Q = quizOn();
+  const Q = quizVis;
   if (Q) frame.light.set(quizScene.light); else drawGarland(now);
   if (Q) drawDoll(painterFor(frame), CX, WALL + 6, quizSt.dollFront, quizSt.dollFront && quizSt.q?.phase === "reveal", now);
   if (Q && quizSt.laser) {
@@ -738,6 +739,7 @@ function tick(nowMs) {
   drawTreeFx(dt);
   drawDust(dt);
   if (!Q) drawSnow(dt, now);
+  drawStorm(dt);
   composite(frame, img.data, Q ? quizScene.bg : bg);
   ctx.putImageData(img, 0, 0);
   drawOverlay();
@@ -1203,6 +1205,36 @@ function applyShow(sh) { setTrack(sh ? "award" : quizOn() ? "quiz" : "carol"); s
 var quizSt = { q: null, votes: {}, dollFront: false };
 let quizScene = null;
 function quizOn() { return !!quizSt?.q; }
+// 화면에 운동장을 그리는지(폭풍 전환 중간에 바뀜)
+var quizVis = false;
+const storm = { t: -1, to: false, parts: [] };
+function startStorm(to) {
+  storm.t = 0; storm.to = to; storm.swapped = false;
+  storm.parts = Array.from({ length: 220 }, () => ({ x: -Math.random() * W, y: Math.random() * H, v: 260 + Math.random() * 420, l: 6 + Math.random() * 30, c: choose(["#e8d6b0", "#c9a46c", "#ffffff", "#9a8a70", "#6fbf55"]) }));
+  sfx.dust(); sfx.boom(); shakeStage();
+}
+function drawStorm(dt) {
+  if (storm.t < 0) return;
+  storm.t += dt;
+  const T = 1.8, u = storm.t / T, p = painterFor(frame);
+  // 왼쪽에서 오른쪽으로 쓸고 가는 모래바람 띠: 띠가 지나간 자리부터 새 배경
+  const front = -120 + u * (W + 240);
+  if (!storm.swapped && u > 0.5) {
+    storm.swapped = true; quizVis = storm.to;
+    for (const r of people) { r.cache.clear(); r.actor = actorFor(r.sprite(0, 0, false)); }
+  }
+  for (let x = Math.max(0, Math.floor(front - 120)); x < Math.min(W, front + 40); x++) {
+    const k = 1 - Math.abs(x - front + 40) / 120;
+    if (k > 0) for (let y = 0; y < H; y += 2) p.blendPx(x, y + ((x + y) & 1), 0xff6a5a40, Math.min(0.85, k * 0.9));
+  }
+  for (const q of storm.parts) {
+    q.x += q.v * dt * 1.6; q.y += Math.sin(q.x / 30) * 0.6;
+    if (q.x > W + 40) continue;
+    p.rect(Math.round(q.x), Math.round(q.y), Math.round(q.l), 1, C(q.c), 0.85);
+  }
+  if (u >= 1) storm.t = -1;
+}
+function shakeStage(big) { const st = $("#stage"); st.classList.remove("hit", "boom"); void st.offsetWidth; st.classList.add(big ? "boom" : "hit"); }
 const QUIZ_LINES = ["이거 O 아니야?", "X 같은데…", "무궁화 꽃이…", "살려줘요 😱", "확실해!", "아 몰라 찍자", "옆사람 따라가야지", "두근두근", "정답 뭐야??"];
 function spotIn(zone) { for (let i = 0; i < 40; i++) { const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * (zone.r - 14); const x = zone.x + Math.cos(a) * d, y = zone.y + Math.sin(a) * d * 0.8; if (y > WALL + 20 && y < H - 8) return { x, y }; } return { x: zone.x, y: zone.y }; }
 function middleSpot() { return { x: W / 2 + (Math.random() - 0.5) * 70, y: WALL + 34 + Math.random() * (H - WALL - 48) }; }
@@ -1210,15 +1242,16 @@ function placeQuiz(r) {
   if (r.d.npc) { r.seat = { x: r.d.id === -1 ? CX - 60 : CX + 60, y: WALL + 22, stand: true, face: 0 }; return; }
   const v = quizSt.votes[r.d.id];
   const s = v === "O" ? spotIn(O_ZONE) : v === "X" ? spotIn(X_ZONE) : middleSpot();
-  r.seat = { x: s.x, y: s.y, stand: true, face: 1 }; r.timer = 0;
+  if ((quizSt.q?.out || []).includes(r.d.id) && quizSt.q?.phase !== "reveal") { r.zapped = true; r.seat = null; return; }
+  r.seat = { x: s.x, y: s.y, stand: true, face: 1, fast: true }; r.timer = 0;
 }
 function applyQuiz(q, votes) {
   const was = quizOn(), prevIdx = quizSt.q?.idx, prevPhase = quizSt.q?.phase;
   quizSt.q = q && q.on ? q : null; quizSt.votes = votes || {};
   if (quizOn() && !quizScene) quizScene = buildQuizBg(W, H);
   if (quizOn() !== was) {
-    for (const r of people) { r.cache.clear(); r.actor = actorFor(r.sprite(0, 0, false)); }
-    if (quizOn()) { setTrack("quiz"); sfx.curtain(); for (const r of people) { r.speech = null; placeQuiz(r); } $("#quizBar").hidden = false; }
+    startStorm(quizOn());
+    if (quizOn()) { setTrack("quiz"); for (const r of people) { r.speech = null; placeQuiz(r); } setTimeout(() => { if (quizOn()) $("#quizBar").hidden = false; }, 900); }
     else {
       setTrack("carol"); $("#quizBar").hidden = true; quizSt.laser = null;
       for (const r of people) r.zapped = false;
@@ -1232,7 +1265,7 @@ function applyQuiz(q, votes) {
   // 새 문제: 모두 가운데로, 인형은 뒤돌아 노래
   if (Qn.idx !== prevIdx || (Qn.phase === "ask" && prevPhase !== "ask")) {
     quizSt.dollFront = false;
-    for (const r of people) { if (r.zapped) { r.zapped = false; r.x = W / 2 + (Math.random() - 0.5) * 60; r.y = H - 20; } placeQuiz(r); r.fx = r.fx.filter((f) => !f.loop); }
+    for (const r of people) { if (r.zapped && !(Qn.out || []).includes(r.d.id)) { r.zapped = false; r.x = W / 2 + (Math.random() - 0.5) * 60; r.y = H - 20; } placeQuiz(r); r.fx = r.fx.filter((f) => !f.loop); }
     sfx.drumroll(0.6);
   }
   if (Qn.phase === "reveal" && prevPhase !== "reveal") {
@@ -1245,12 +1278,20 @@ function applyQuiz(q, votes) {
         if (v === Qn.a) r.emote("party"); else if (v) { losers.push(r); r.say("헉…! 😱", 2); }
       }
       if (!losers.length) sfx.fanfare();
-      // 인형 눈에서 레이저: 오답자를 한 명씩 빠르게
-      losers.sort(() => Math.random() - 0.5).forEach((r, i) => setTimeout(() => {
+      // 인형 눈 레이저: 몇 명만 맞고(가루), 나머지는 비명 지르며 화면 밖으로 도망
+      losers.sort(() => Math.random() - 0.5);
+      const nZap = Math.min(losers.length, Math.max(1, Math.round(losers.length * 0.35)), 5);
+      losers.slice(0, nZap).forEach((r, i) => setTimeout(() => {
         if (!quizOn() || r.zapped) return;
         quizSt.laser = { r, t: 0 }; sfx.laser(); r.speech = null;
-        setTimeout(() => { if (r.last) dissolve(r); r.zapped = true; sfx.dust(); }, 140);
-      }, 700 + i * 260));
+        setTimeout(() => { if (r.last) dissolve(r); r.zapped = true; sfx.dust(); shakeStage(); }, 140);
+      }, 700 + i * 320));
+      setTimeout(() => losers.slice(nZap).forEach((r) => {
+        if (!quizOn() || r.zapped) return;
+        const left = r.x < W / 2 ? Math.random() < 0.7 : Math.random() < 0.3;
+        r.seat = { x: left ? -30 : W + 30, y: r.y + (Math.random() - 0.5) * 40, stand: true, fast: true, flee: true };
+        r.speed = Math.max(r.speed, 26); r.say(choose(["도망쳐!!", "살려줘요 😱", "으아아악", "엄마!!"]), 1.6);
+      }), 700 + nZap * 320 + 200);
     }, 900);
   }
   renderQuizBar();
