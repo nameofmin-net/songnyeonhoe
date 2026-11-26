@@ -55,7 +55,7 @@ function resize() {
 }
 addEventListener("resize", resize);
 // 창 비율이 크게 바뀌면 광장을 새 폭으로 다시 짓는다(명단·채팅은 서버에서 다시 받아옴)
-let rzT; addEventListener("resize", () => { clearTimeout(rzT); rzT = setTimeout(() => { const aw = innerWidth - 584, ah = innerHeight - 20; const want = innerWidth < 1000 ? 640 : Math.max(400, Math.min(760, Math.round((H * aw / ah) / 2) * 2)); if (Math.abs(want - W) > 16) location.reload(); }, 700); });
+// (창 크기 변화로 자동 새로고침하던 기능 제거: TV·모바일에서 반복 새로고침 유발)
 resize();
 
 // ---------- 배경 ----------
