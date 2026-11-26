@@ -1294,7 +1294,8 @@ function applyQuiz(q, votes) {
       for (const r of people) {
         if (r.d.npc) continue;
         const v = quizSt.votes[r.d.id];
-        if (v === Qn.a) r.emote("party"); else if (v) { losers.push(r); r.say("헉…! 😱", 2); }
+        if ((quizSt.q.out || []).includes(r.d.id) && !v && r.zapped) continue; // 이미 탈락한 사람
+        if (v === Qn.a) r.emote("party"); else { losers.push(r); r.say(v ? "헉…! 😱" : "앗 안 골랐다…", 2); }
       }
       if (!losers.length) sfx.fanfare();
       // 인형 눈 레이저: 몇 명만 맞고(가루), 나머지는 비명 지르며 화면 밖으로 도망

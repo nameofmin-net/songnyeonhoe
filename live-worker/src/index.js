@@ -173,7 +173,8 @@ export class Room extends DurableObject {
         const act = String(body.action || ""), n = this.quizQs.length;
         const ask = (idx, out) => { this.votes = new Map(); this.quiz = { on: true, idx, total: n, phase: "ask", q: this.quizQs[idx].q, out, at: Date.now() }; };
         if (act === "start") { if (!n) return json(req, { error: "no questions" }, 400); this.votes = new Map(); this.quiz = { on: true, idx: -1, total: n, phase: "ready", q: "", out: [], at: Date.now() }; }
-        else if (act === "reveal" && this.quiz) { const qq = this.quizQs[this.quiz.idx]; const c = { O: 0, X: 0 }; for (const v of this.votes.values()) c[v]++; const ans = qq ? qq.a : "O", out = new Set(this.quiz.out || []); for (const [k, v] of this.votes) if (v !== ans) out.add(k); this.quiz = { ...this.quiz, phase: "reveal", a: ans, counts: c, out: [...out] }; }
+        else if (act === "reveal" && this.quiz) { const qq = this.quizQs[this.quiz.idx]; const c = { O: 0, X: 0 }; for (const v of this.votes.values()) c[v]++; const ans = qq ? qq.a : "O", out = new Set(this.quiz.out || []); for (const [k, v] of this.votes) if (v !== ans) out.add(k);
+          for (const a of this.list()) if (!this.votes.has(a.id)) out.add(a.id); // 입력 안 한 사람도 탈락 this.quiz = { ...this.quiz, phase: "reveal", a: ans, counts: c, out: [...out] }; }
         else if (act === "next" && this.quiz && this.quiz.phase === "ready") ask(0, []);
         else if (act === "next" && this.quiz) { if (this.quiz.idx + 1 >= n) this.quiz = { ...this.quiz, phase: "end" }; else ask(this.quiz.idx + 1, this.quiz.out || []); }
         else if (act === "goto" && this.quiz) { const i = Number(body.idx); if (i >= 0 && i < n) ask(i, this.quiz.out || []); }
