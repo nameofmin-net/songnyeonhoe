@@ -937,6 +937,7 @@ function fillShow(sh) {
   showCard.style.setProperty("--ph", ph + "cqh"); showCard.style.setProperty("--pf", pf + "cqw");
   showCard.innerHTML = `<div class="sh-t"><small>2026 U PLEAT AWARDS</small>${esc(sh.title)}</div>
     ${sh.sub ? `<div class="sh-s">${esc(sh.sub)}</div>` : ""}
+    ${sh.prizeOn && sh.prize ? `<div class="sh-prize">상금 : ${esc(sh.prize)}</div>` : ""}
     <div class="ppl">${sh.people.filter((id) => ALL[id]).map((id) => `<div class="pp" data-id="${id}"><div class="bub"></div><div class="emo"></div><canvas width="${SW}" height="${SH}"></canvas><b>${esc(ALL[id].name)}${ALL[id].rank ? `<small>${ALL[id].rank}</small>` : ""}</b></div>`).join("")}</div>
     <div class="sh-congrats">🎉 축하합니다! 🎉</div>`;
   walkers = []; cancelAnimationFrame(walkRaf); walkRaf = 0;
@@ -997,7 +998,7 @@ function startWalkers() {
   // 걸어 나오는 동안 발소리 느낌으로 박수
   setTimeout(() => sfx.applause(3), 400);
 }
-function stepClass(step) { showEl.classList.remove("s0", "s1", "s2"); showEl.classList.add("s" + step); }
+function stepClass(step) { showEl.classList.remove("s0", "s1", "s2", "s3"); showEl.classList.add("s" + step); }
 function confettiRain() {
   const box = showEl.querySelector(".sh-conf"), cols = ["#ffd84a", "#ff5a5a", "#5ae08a", "#5ab4ff", "#ff8ad8", "#ffffff"];
   box.innerHTML = Array.from({ length: 90 }, () => `<i style="left:${Math.random() * 100}%;background:${choose(cols)};animation-duration:${(2.2 + Math.random() * 2).toFixed(2)}s;animation-delay:${(Math.random() * 1.2).toFixed(2)}s"></i>`).join("");
@@ -1018,13 +1019,15 @@ async function doShow(sh) {
     showCur = null;
     await closeCurtain();
     cancelAnimationFrame(walkRaf); walkRaf = 0; walkers = [];
-    showEl.classList.remove("on", "s0", "s1", "s2"); showCard.innerHTML = "";
+    stopRace(); showEl.classList.remove("on", "s0", "s1", "s2", "s3", "up"); showCard.innerHTML = "";
     await wait(300); openCurtain();
     return;
   }
+  if (sh.kind === "upleaders") return doUpl(sh, isNew);
   if (isNew) {
     showCur = { ...sh, step: 0 };
     await closeCurtain();
+    stopRace(); showEl.classList.remove("up", "s3");
     fillShow(sh); stepClass(0); showEl.classList.add("on");
     sfx.drumroll(1.1); await wait(1200);
     openCurtain(); await wait(500); sfx.fanfare();
@@ -1038,6 +1041,92 @@ async function doShow(sh) {
   if (sh.step >= 1 && prev < 1) { sfx.drumroll(0.7); await wait(80); startWalkers(); }
   if (sh.step === 0) { cancelAnimationFrame(walkRaf); walkRaf = 0; walkers = []; showCard.querySelectorAll(".pp").forEach((e) => { e.classList.remove("here"); e.style.transform = ""; }); }
   if (sh.step === 2) { sfx.fanfare(); sfx.applause(3); confettiRain(); for (const id of sh.people) people.find((p) => p.d.id === id)?.emote("party"); }
+}
+// ---------- 올해의 유플리더스: 오프닝 → 상 소개 → 레이스(막판 역전) → 축하 ----------
+let race = null;
+function stopRace() { if (race) { cancelAnimationFrame(race.raf); race = null; } }
+function uplHTML(sh) {
+  const w = ALL[sh.winner];
+  return `<div class="up-corner tl"><b>U PLEAT</b><span>People &amp;<br>Projects of the<br>Year</span><b>AWARD 2026</b></div>
+    <div class="up-corner br"><b>U PLEAT</b><span>Inspired by Essence</span></div>
+    <div class="up-p up-0"><div class="up-big">🌿 올해의<br>유플리더스 🌿</div></div>
+    <div class="up-p up-1"><div class="up-kicker">올해의 유플리더스</div><div class="up-title">${esc(sh.title)}</div>${sh.desc ? `<p class="up-desc">${esc(sh.desc)}</p>` : ""}${sh.prizeOn && sh.prize ? `<div class="up-prize">상금 : ${esc(sh.prize)}</div>` : ""}</div>
+    <div class="up-p up-2"><div class="up-kicker">올해의 유플리더스</div><div class="up-title sm">${esc(sh.title)}</div><div class="up-call"></div><div class="track"><div class="finish"></div></div>
+      <div class="up-win"><div class="up-title">${esc(sh.title)} : ${w ? esc(w.name) : ""}</div><div class="up-medal"><canvas width="${SW}" height="${SH}"></canvas></div>${sh.quote ? `<p class="up-quote">“${esc(sh.quote)}”</p>` : ""}</div></div>`;
+}
+function drawSpr(cv, id, dir, step, cache) {
+  const img = spriteImage(styleOf(id), dir, step, cache);
+  const g = cv.getContext("2d"); g.clearRect(0, 0, SW, SH); g.putImageData(img, 0, 0);
+}
+function startRace(sh) {
+  stopRace();
+  const box = showCard.querySelector(".track"), call = showCard.querySelector(".up-call"), panel = showCard.querySelector(".up-2");
+  const ids = [sh.winner, ...(sh.rivals || [])].filter((id) => ALL[id]).sort(() => Math.random() - 0.5);
+  const winEl = showCard.querySelector(".up-win");
+  if (ids.length < 2) { panel.classList.add("done"); revealWinner(sh); return; }
+  const lanes = ids.length;
+  box.innerHTML = `<div class="finish"></div>` + ids.map((id, i) => `<div class="rn" data-id="${id}" style="top:${(i / lanes) * 100}%;height:${100 / lanes}%"><canvas width="${SW}" height="${SH}"></canvas><b>${esc(ALL[id].name)}</b></div>`).join("");
+  const els = [...box.querySelectorAll(".rn")];
+  box.style.setProperty("--lanes", lanes);
+  const D = 8.5;
+  // 경쟁자: 들쭉날쭉 앞서거니 뒤서거니, 결승 직전 0.86~0.95에서 멈춤 / 수상자: 뒤처지다 막판 역전
+  const rv = ids.map((id) => ({ id, win: id === sh.winner, end: 0.86 + Math.random() * 0.09, a: 0.04 + Math.random() * 0.05, f: 1.2 + Math.random() * 1.6, ph: Math.random() * 6.28, cache: new Map() }));
+  const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const pos = (r, t) => r.win ? 0.8 * t + 0.2 * sm(0.72, 1, t) - 0.04 * Math.sin(t * 6.28) * (1 - t)
+    : Math.min(r.end, r.end * (t + r.a * Math.sin(r.f * 6.28 * t + r.ph) * (1 - t) + 0.06 * Math.sin(t * 3.14)));
+  const calls = [[0, "출발! 🏁"], [0.25, "치열한 접전!"], [0.5, "선두가 계속 바뀌어요!"], [0.72, "어?! 뒤에서 누가 치고 나와요!"], [0.88, "역전!!! 🔥"], [1, "결승!"]];
+  let t0 = performance.now(), lastCall = -1, phase = "run", endAt = 0;
+  sfx.drumroll(1.0); setTimeout(() => sfx.applause(4), 600);
+  const W = box.clientWidth, runW = W * 0.86;
+  const tick = (ms) => {
+    const t = Math.min(1, (ms - t0) / 1000 / D);
+    const ci = calls.findLastIndex(([at]) => t >= at);
+    if (ci !== lastCall) { lastCall = ci; call.textContent = calls[ci][1]; call.classList.remove("pop"); void call.offsetWidth; call.classList.add("pop"); if (calls[ci][0] === 0.88) { sfx.drumroll(0.6); } }
+    // 선두 표시
+    const ps = rv.map((r) => pos(r, t)), lead = ps.indexOf(Math.max(...ps));
+    rv.forEach((r, i) => {
+      const el = els[i];
+      el.style.transform = `translateX(${(ps[i] * runW).toFixed(1)}px)`;
+      el.classList.toggle("lead", i === lead && t > 0.05);
+      const step = phase === "run" && t < 1 ? Math.floor(ms / 90) % 4 : 0;
+      const key = (phase === "run" && t < 1 ? 2 : 0) * 10 + step;
+      if (r.key !== key) { r.key = key; drawSpr(el.querySelector("canvas"), r.id, phase === "run" && t < 1 ? 2 : 0, step, r.cache); }
+    });
+    if (t >= 1 && phase === "run") {
+      phase = "out"; endAt = ms; sfx.fanfare();
+      // 최후 1인만 남기고 하나씩 사라진다
+      rv.forEach((r, i) => { if (!r.win) setTimeout(() => { els[i].classList.add("out"); sfx.pop(); }, 500 + i * 220); });
+      setTimeout(() => { panel.classList.add("done"); revealWinner(sh); }, 900 + lanes * 220);
+    }
+    if (race) race.raf = requestAnimationFrame(tick);
+  };
+  race = { raf: requestAnimationFrame(tick) };
+}
+function revealWinner(sh) {
+  const cv = showCard.querySelector(".up-medal canvas"), cache = new Map();
+  drawSpr(cv, sh.winner, 0, 0, cache);
+  showCard.querySelector(".up-win").classList.add("on");
+  sfx.fanfare(); sfx.applause(3);
+  people.find((p) => p.d.id === sh.winner)?.emote("party");
+}
+async function doUpl(sh, isNew) {
+  if (isNew) {
+    showCur = { ...sh, step: 0 };
+    await closeCurtain();
+    stopRace(); showEl.classList.remove("s0", "s1", "s2", "s3"); showEl.classList.add("up", "on");
+    showCard.style.removeProperty("--ph"); showCard.innerHTML = uplHTML(sh); stepClass(0);
+    sfx.drumroll(1.1); await wait(1200);
+    openCurtain(); await wait(500); sfx.fanfare();
+    if (sh.step === 0) return;
+    await wait(700);
+  }
+  const prev = showCur.step ?? 0;
+  showCur = sh;
+  if (sh.step === prev && !isNew) return;
+  showEl.classList.remove("s0", "s1", "s2", "s3"); showEl.classList.add("s" + sh.step);
+  if (sh.step === 1) { stopRace(); sfx.curtain(); }
+  if (sh.step === 2 && prev !== 3) { await wait(100); startRace(sh); }
+  if (sh.step === 3) { if (!showCard.querySelector(".up-win.on")) { stopRace(); showCard.querySelector(".up-2").classList.add("done"); revealWinner(sh); } sfx.fanfare(); sfx.applause(3); confettiRain(); }
 }
 function applyShow(sh) { showChain = showChain.then(() => doShow(sh)).catch(() => {}); }
 
