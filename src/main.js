@@ -13,6 +13,7 @@ import * as beer from "./beer.js";
 import * as transform from "./transform.js";
 import { drawSpecial, floatOf } from "./special.js";
 import { createCurtain } from "./curtain.js";
+import { buildOfficeBg, officeLamp, officeSofa, officePlant, officeTable } from "./office.js";
 import { buildQuizBg, drawDoll, WALL, O_ZONE, X_ZONE, setQuizW } from "./quiz.js";
 import { sfx, setSound, soundOn, savedPref, setTrack } from "./audio.js";
 import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf, chatItemHTML } from "./joinform.js";
@@ -718,7 +719,7 @@ function tick(nowMs) {
 
   frame.color.fill(0); frame.light.set(staticLight);
   const Q = quizVis;
-  if (Q) frame.light.set(quizScene.light); else drawGarland(now);
+  if (Q) frame.light.set(quizScene.light); else { if (officeOn) frame.light.set(officeScene.light); drawGarland(now); }
   let dollY = 0;
   if (Q && quizSt.drop) {
     const D = quizSt.drop; D.t += dt;
@@ -751,15 +752,15 @@ function tick(nowMs) {
         const sx = tree.shake > 0 ? Math.round(Math.sin(tree.shake * 60)) : 0, pp = sx ? { ...it.p, x: it.p.x + sx } : it.p;
         if (from > 0) blitProp(pp, from);
         else { blitProp(pp); drawTreeLights(painterFor(frame), pp.x, pp.y, now); }
-      } else blitProp(it.p);
+      } else blitProp(officeOn ? { ...it.p, spr: OFFICE_SWAP.get(it.p.spr) || it.p.spr } : it.p);
     }
   }
   for (const it of items) if (it.r) it.r.drawFront();
   drawTreeFx(dt);
   drawDust(dt);
-  if (!Q) drawSnow(dt, now);
+  if (!Q && !officeOn) drawSnow(dt, now);
   drawStorm(dt);
-  composite(frame, img.data, Q ? quizScene.bg : bg);
+  composite(frame, img.data, Q ? quizScene.bg : officeOn ? officeScene.bg : bg);
   ctx.putImageData(img, 0, 0);
   drawOverlay();
   requestAnimationFrame(tick);
@@ -890,6 +891,19 @@ function sparkleAt(p, x, y, u, n) {
 // 트리 행 중 보이는 시작 줄(0 = 전부, h = 안 보임)
 const treeFromRow = () => (tree.gone ? bigTree.h : tree.boom < 0 ? 0 : Math.ceil(bigTree.h * (1 - growOf(tree.boom))));
 
+// ---------- 이스터에그: 단상 뒤 출입문 더블클릭 → 유플리트 사옥 ⇄ 광장 ----------
+let officeOn = false, officeScene = null;
+const OFFICE_SWAP = new Map([[lampSpr, officeLamp], [benchSpr, officeSofa], [treeSpr, officePlant], [potSpr, officeTable]]);
+function toggleOffice() {
+  if (!officeScene) officeScene = buildOfficeBg(W, H, CX, FY, FLOOR_TOP, props.filter((p) => p.spr === lampSpr).map((p) => [p.x, p.y]));
+  sfx.enter?.();
+  cv.animate([{ filter: "brightness(1)" }, { filter: "brightness(0)", offset: 0.45 }, { filter: "brightness(0)", offset: 0.55 }, { filter: "brightness(1)" }], { duration: 700, easing: "ease-in-out" });
+  setTimeout(() => { officeOn = !officeOn; }, 340);
+}
+ov.addEventListener("dblclick", (e) => {
+  const rect = ov.getBoundingClientRect(), x = (e.clientX - rect.left) / S, y = (e.clientY - rect.top) / S;
+  if (Math.abs(x - CX) < 24 && y < FLOOR_TOP + 2 && !quizVis) toggleOffice();
+});
 // 클릭 → 그 사람이 반응
 ov.addEventListener("pointerdown", (e) => {
   const rect = ov.getBoundingClientRect(), x = (e.clientX - rect.left) / S, y = (e.clientY - rect.top) / S;
@@ -1449,5 +1463,5 @@ connectLive({
 renderLists();
 if (params.get("arrive")) setTimeout(() => randomArrivals(+params.get("arrive"), true), 400);
 // 테스트용(서버에 아무것도 보내지 않음): ?debug 로 열면 콘솔에서 광장 캐릭터를 직접 움직일 수 있다
-if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride, explode: () => explodeTree(), leaveAll: () => { for (const id of [...present.keys()]) leave(id); }, show: (sh) => applyShow(sh), quiz: (q, v) => applyQuiz(q, v), vote: onVote, get qs() { return quizSt; }, ceremony: (on) => setCeremony(on), arrive: (id, m) => arrive(id, m || "") };
+if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride, explode: () => explodeTree(), leaveAll: () => { for (const id of [...present.keys()]) leave(id); }, show: (sh) => applyShow(sh), quiz: (q, v) => applyQuiz(q, v), vote: onVote, get qs() { return quizSt; }, ceremony: (on) => setCeremony(on), office: () => toggleOffice(), arrive: (id, m) => arrive(id, m || "") };
 (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(tick));

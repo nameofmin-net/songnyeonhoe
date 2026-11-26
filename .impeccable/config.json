@@ -1,0 +1,20 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(.34, 1.6, .5, 1)",
+        "createdAt": "2026-11-26T04:44:01.869Z",
+        "reason": "User confirmed press rebound is intentional"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(.34, 1.8, .5, 1)",
+        "createdAt": "2026-11-26T04:44:01.906Z",
+        "reason": "User confirmed press rebound is intentional"
+      }
+    ]
+  }
+}
