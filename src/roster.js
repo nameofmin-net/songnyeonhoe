@@ -30,3 +30,7 @@ const RANKS = [
 ];
 const RANK_OF = new Map(RANKS.flatMap(([r, names]) => names.map((n) => [n, r])));
 for (const p of ROSTER) p.rank = RANK_OF.get(p.name) || "";
+
+// 명단에 없는 사람(직접 입력)용 빈 자리: 이름은 입장할 때 정해진다
+export const GUESTS = 30;
+for (let i = 0; i < GUESTS; i++) ROSTER.push({ name: "", gender: i % 2 ? "F" : "M", unsure: false, rank: "", guest: true });

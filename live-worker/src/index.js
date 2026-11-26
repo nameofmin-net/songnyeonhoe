@@ -2,7 +2,7 @@
 // 캐릭터 위치는 주고받지 않는다(각 화면이 랜덤으로 움직임).
 import { DurableObject } from "cloudflare:workers";
 
-const MAX = 104, MSG = 40;
+const ROSTER_N = 104, GUESTS = 30, MAX = ROSTER_N + GUESTS, MSG = 40;
 const ORIGINS = ["https://nameofmin-net.github.io", "http://localhost:8931"];
 
 function cors(req) {
@@ -36,6 +36,7 @@ function cleanStyle(v) {
     const x = v[k];
     if (typeof x === "string" && /^([a-z]{2,12}|#[0-9a-f]{6})$/i.test(x)) out[k] = x.toLowerCase();
   }
+  if (typeof v.nm === "string") { const nm = v.nm.replace(/[^가-힣a-zA-Z0-9]/g, "").slice(0, 10); if (nm) out.nm = nm; }
   return out;
 }
 const row = (r) => ({ id: r.id, message: r.message, at: r.at, style: JSON.parse(r.style || "{}") });
@@ -92,13 +93,27 @@ export class Room extends DurableObject {
     try { body = await req.json(); } catch {}
 
     if (path === "/api/join") {
-      const id = Number(body.id), message = String(body.message ?? "").trim().slice(0, MSG);
+      let id = Number(body.id); const message = String(body.message ?? "").trim().slice(0, MSG);
+      let gstyle = null;
+      if (typeof body.guest === "string") {
+        // 직접 입력: 같은 이름이 이미 있으면 그 자리, 없으면 성별에 맞는 빈 손님 자리를 서버가 고른다
+        const nm = cleanStyle({ nm: body.guest }).nm; if (!nm) return json(req, { error: "bad name" }, 400);
+        const used = this.list().filter((a) => a.id >= ROSTER_N);
+        const same = used.find((a) => a.style.nm === nm);
+        if (same) id = same.id;
+        else {
+          const taken = new Set(used.map((a) => a.id)), odd = body.gender === "F" ? 1 : 0;
+          id = -1; for (let i = 0; i < GUESTS; i++) if (i % 2 === odd && !taken.has(ROSTER_N + i)) { id = ROSTER_N + i; break; }
+          if (id < 0) return json(req, { error: "full" }, 409);
+          gstyle = { nm };
+        }
+      }
       if (!Number.isInteger(id) || id < 0 || id >= MAX) return json(req, { error: "bad id" }, 400);
       if (!message) return json(req, { error: "empty message" }, 400);
       const had = this.ctx.storage.sql.exec("SELECT id, message, at, style FROM att WHERE id = ?", id).toArray()[0];
       // 이미 입장한 이름이면 새로 넣지 않고 그 사람의 정보를 돌려준다
       if (had) return json(req, { ok: false, already: true, entry: row(had) });
-      const at = Date.now(), style = cleanStyle(body.style);
+      const at = Date.now(), style = { ...cleanStyle(body.style), ...(gstyle || {}) };
       this.ctx.storage.sql.exec("INSERT INTO att (id, message, at, style) VALUES (?, ?, ?, ?)", id, message, at, JSON.stringify(style));
       this.broadcast({ type: "join", id, message, at, style });
       return json(req, { ok: true, entry: { id, message, at, style } });
@@ -109,7 +124,7 @@ export class Room extends DurableObject {
       if (!had) return json(req, { error: "not joined" }, 404);
       const cur = row(had);
       const message = body.message === undefined ? cur.message : String(body.message).trim().slice(0, MSG) || cur.message;
-      const style = body.style === undefined ? cur.style : cleanStyle(body.style);
+      const style = body.style === undefined ? cur.style : { ...cleanStyle(body.style), ...(cur.style.nm ? { nm: cur.style.nm } : {}) };
       this.ctx.storage.sql.exec("UPDATE att SET message = ?, style = ? WHERE id = ?", message, JSON.stringify(style), id);
       const e = { id, message, at: cur.at, style };
       this.broadcast({ type: "update", ...e });

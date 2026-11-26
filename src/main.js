@@ -640,7 +640,7 @@ const present = new Map(); // id -> { message, at }
 const $ = (q) => document.querySelector(q);
 
 function renderLists(highlight) {
-  const waiting = ALL.map((d) => d.id).filter((id) => !present.has(id));
+  const waiting = ALL.filter((d) => !d.guest).map((d) => d.id).filter((id) => !present.has(id));
   const pres = [...present.entries()].sort((a, b) => b[1].at - a[1].at);
   $("#waitN").textContent = waiting.length;
   $("#presN").textContent = pres.length;
@@ -717,7 +717,7 @@ function nextAnnounce() {
 
 const SAMPLE_MSG = ["올해 정말 고생 많으셨어요!", "내년에도 잘 부탁드립니다 🙏", "다들 건강하세요!", "올해 최고의 팀이었어요 👏", "새해 복 많이 받으세요", "맛있는 거 먹으러 왔어요 🍗", "내년엔 더 재밌게!", "올 한 해 감사했습니다", "회식 2차 갑니다 🍻", "다들 사랑합니다 ❤️"];
 function randomArrivals(n, local = false) {
-  const waiting = ALL.map((d) => d.id).filter((id) => !present.has(id));
+  const waiting = ALL.filter((d) => !d.guest).map((d) => d.id).filter((id) => !present.has(id));
   for (let i = 0; i < n && waiting.length; i++) {
     const id = waiting.splice(Math.floor(Math.random() * waiting.length), 1)[0];
     setTimeout(() => (local ? arrive(id, choose(SAMPLE_MSG)) : sendJoin(id, choose(SAMPLE_MSG)).catch(() => {})), i * 700);

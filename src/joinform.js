@@ -5,7 +5,7 @@ import { drawSpecial, floatOf } from "./special.js";
 
 import { ROSTER } from "./roster.js";
 export const ALL = makePopulation(0, 2026, ROSTER);
-ALL.forEach((d, i) => (d.rank = ROSTER[i].rank));
+ALL.forEach((d, i) => { d.rank = ROSTER[i].rank; d.guest = !!ROSTER[i].guest; if (d.guest) d.name = "손님"; });
 export const MAX = ALL.length;
 export const byId = (id) => ALL[id];
 export const sortedByName = (ids) => [...ids].sort((a, b) => ALL[a].name.localeCompare(ALL[b].name, "ko"));
@@ -14,7 +14,7 @@ export const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "
 
 // ---------- 복장 덮어쓰기 ----------
 const overrides = new Map(); // id -> 사용자가 고른 항목
-export function setOverride(id, ov) { overrides.set(id, ov && typeof ov === "object" ? ov : {}); }
+export function setOverride(id, ov) { overrides.set(id, ov && typeof ov === "object" ? ov : {}); if (ALL[id]?.guest && ov?.nm) ALL[id].name = ov.nm; }
 export const styleOf = (id, ov = overrides.get(id)) => applyStyle(ALL[id].style, ov);
 
 // ---------- 실시간 중계 서버 ----------
@@ -27,7 +27,7 @@ async function post(path, body, headers = {}) {
   if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
   return data;
 }
-export const sendJoin = (id, message) => post("/api/join", { id, message });
+export const sendJoin = (id, message, guest) => post("/api/join", guest ? { guest: guest.name, gender: guest.gender, message } : { id, message });
 export const sendUpdate = (id, patch) => post("/api/update", { id, ...patch });
 export const sendCheers = () => post("/api/cheers");
 export const sendChat = (id, text) => post("/api/chat", { id, text });
@@ -123,6 +123,22 @@ const CSS = `
 .jf-title small { display: block; color: #9a90b0; font-size: 12px; margin-top: 4px; }
 .jf label, .jf .lab { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #c9c0dc; }
 .jf select, .jf textarea { font: inherit; font-size: 16px; color: #f4eefc; background: #15101f; border: 2px solid #4a3f6a; padding: 10px 12px; border-radius: 0; width: 100%; }
+.jf input[type=search] { font: inherit; font-size: 16px; color: #f4eefc; background: #15101f; border: 2px solid #4a3f6a; padding: 10px 12px; border-radius: 0; width: 100%; -webkit-appearance: none; appearance: none; }
+.jf input[type=search]:focus { outline: none; border-color: #ffd84a; }
+.jf input.picked { border-color: #ffd84a; color: #ffd84a; cursor: pointer; }
+.jf .hits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.jf .hits:empty { display: none; }
+.jf .hits button { font: inherit; font-size: 15px; width: 100%; display: flex; align-items: center; gap: 10px; padding: 6px 10px; color: #f4eefc; background: #221a36; border: 2px solid #4a3f6a; cursor: pointer; text-align: left; }
+.jf .hits button img { width: 24px; height: 36px; image-rendering: pixelated; }
+.jf .hits button em { margin-left: auto; font-style: normal; font-size: 11px; color: #9a90b0; }
+.jf .hits .rk { font-size: 11px; color: #9a90b0; }
+.jf .hits .direct { justify-content: center; color: #1c1624; background: #ffd84a; border-color: #fff3b0; padding: 10px; }
+.jf .hits .none { font-size: 12px; color: #9a90b0; padding: 4px 2px; }
+.jf .gst-row { display: flex; align-items: center; gap: 6px; font-size: 13px; flex-wrap: wrap; }
+.jf .gst-nm { color: #ffd84a; font-size: 15px; margin-right: auto; }
+.jf .gsx { font: inherit; font-size: 13px; padding: 6px 12px; color: #f4eefc; background: #221a36; border: 2px solid #4a3f6a; cursor: pointer; }
+.jf .gsx.on { background: #ffd84a; color: #1c1624; border-color: #fff3b0; }
+.jf .gsx.x { color: #9a90b0; }
 .jf select:focus, .jf textarea:focus { outline: none; border-color: #ffd84a; }
 .jf textarea { resize: none; height: 72px; line-height: 1.5; }
 .jf .cnt { align-self: flex-end; font-size: 11px; color: #7a7090; }
@@ -276,10 +292,16 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
       <form class="jf" autocomplete="off">
         <div class="jf-head">
           <div class="jf-av"><span class="q">?</span></div>
-          <div class="jf-title">2026 송년회 입장<small>내 이름을 고르고 올해 한마디를 남겨 주세요</small></div>
+          <div class="jf-title">2026 송년회 입장<small>내 이름을 검색하고 올해 한마디를 남겨 주세요</small></div>
         </div>
         <div class="note">${esc(note)}</div>
-        <label>이름 <select name="who" required></select></label>
+        <div class="lab">이름
+          <input name="q" type="search" placeholder="이름을 검색하세요" autocomplete="off" enterkeyhint="search">
+          <ul class="hits"></ul>
+          <div class="gst" hidden>
+            <div class="gst-row"><b class="gst-nm"></b><span>성별</span><button type="button" class="gsx on" data-g="M">남</button><button type="button" class="gsx" data-g="F">여</button><button type="button" class="gsx x" data-act="gx">다시 검색</button></div>
+          </div>
+        </div>
         <label class="msgbox">올해 한마디
           <textarea name="msg" maxlength="40" placeholder="예) 올해 다들 고생 많았어요!"></textarea>
           <span class="cnt">0 / 40</span>
@@ -287,38 +309,58 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
         <button class="btn" type="submit" disabled>입장하기 🎉</button>
         <div class="msg"></div>
       </form>`;
-    const f = root.querySelector("form"), sel = f.who, msg = f.msg, btn = f.querySelector(".btn"), av = f.querySelector(".jf-av"), cnt = f.querySelector(".cnt"), out = f.querySelector(".msg"), noteEl = f.querySelector(".note"), box = f.querySelector(".msgbox");
+    const f = root.querySelector("form"), q = f.q, hits = f.querySelector(".hits"), gst = f.querySelector(".gst"), msg = f.msg, btn = f.querySelector(".btn"), av = f.querySelector(".jf-av"), cnt = f.querySelector(".cnt"), out = f.querySelector(".msg"), noteEl = f.querySelector(".note"), box = f.querySelector(".msgbox");
+    let pickId = null, guest = null; // guest = { name, gender }
+    const norm = (t) => t.replace(/\s+/g, "");
     const fill = () => {
-      const keep = sel.value, E = entries();
-      const ids = sortedByName(ALL.map((d) => d.id));
-      const waitN = ids.filter((id) => !E.has(id)).length;
-      sel.innerHTML = `<option value="">이름을 선택하세요 (${waitN}명 대기)</option>` +
-        ids.map((id) => `<option value="${id}">${ALL[id].name}${E.has(id) ? " · 입장 완료" : ""}</option>`).join("");
-      sel.value = keep;
+      const E = entries(), t = norm(q.value);
+      if (pickId !== null || guest) { hits.innerHTML = ""; return; }
+      if (!t) { hits.innerHTML = ""; return; }
+      const ids = sortedByName(ALL.filter((d) => !d.guest ? d.name.includes(t) : E.has(d.id) && d.name.includes(t)).map((d) => d.id)).slice(0, 8);
+      hits.innerHTML = ids.map((id) => `<li><button type="button" data-id="${id}"><img alt="" src="${avatarURL(id, 2, true)}"><span>${esc(ALL[id].name)}</span>${ALL[id].rank ? `<small class="rk">${ALL[id].rank}</small>` : ""}${E.has(id) ? `<em>입장 완료</em>` : ""}</button></li>`).join("") +
+        (ids.length ? "" : `<li class="none">“${esc(t)}” 님을 명단에서 못 찾았어요</li>`) +
+        (t.length >= 2 && !ids.some((id) => ALL[id].name === t) ? `<li><button type="button" class="direct" data-act="direct">✏️ “${esc(t)}” 이름으로 직접 입력</button></li>` : "");
     };
     const check = () => {
-      const id = sel.value === "" ? null : +sel.value, done = id !== null && entries().has(id);
-      av.innerHTML = id === null ? `<span class="q">?</span>` : `<img alt="" src="${avatarURL(id, 3)}">`;
+      const id = pickId, done = id !== null && entries().has(id);
+      av.innerHTML = id !== null ? `<img alt="" src="${avatarURL(id, 3)}">` : `<span class="q">${guest ? "✏️" : "?"}</span>`;
+      q.readOnly = id !== null || !!guest; q.classList.toggle("picked", q.readOnly);
+      gst.hidden = !guest;
+      if (guest) { gst.querySelector(".gst-nm").textContent = guest.name + " 님"; gst.querySelectorAll("[data-g]").forEach((b) => b.classList.toggle("on", b.dataset.g === guest.gender)); }
       box.hidden = done;
       if (done) noteEl.textContent = "이미 입장한 이름이에요. 아래 버튼으로 내 캐릭터를 열 수 있어요.";
       else if (noteEl.textContent.startsWith("이미 입장한")) noteEl.textContent = "";
       btn.textContent = done ? "내 캐릭터 열기" : "입장하기 🎉";
-      btn.disabled = id === null || (!done && !msg.value.trim());
+      btn.disabled = (id === null && !guest) || (!done && !msg.value.trim());
       cnt.textContent = `${msg.value.length} / 40`;
     };
-    sel.addEventListener("change", () => { out.textContent = ""; check(); });
+    const unpick = () => { pickId = null; guest = null; q.value = ""; out.textContent = ""; fill(); check(); q.focus(); };
+    q.addEventListener("input", () => { out.textContent = ""; fill(); });
+    q.addEventListener("click", () => { if (q.readOnly) unpick(); });
+    q.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); hits.querySelector("button")?.click(); } });
+    hits.addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.act === "direct") { guest = { name: norm(q.value).slice(0, 10), gender: "M" }; q.value = guest.name; }
+      else { pickId = +b.dataset.id; q.value = ALL[pickId].name; }
+      fill(); check(); if (!box.hidden) msg.focus();
+    });
+    gst.addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.act === "gx") return unpick();
+      guest.gender = b.dataset.g; check();
+    });
     msg.addEventListener("input", check);
     f.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (btn.disabled) return;
-      const id = +sel.value;
-      if (entries().has(id)) { open(id, "already"); return; }
+      if (pickId !== null && entries().has(pickId)) { open(pickId, "already"); return; }
       btn.disabled = true; out.textContent = "보내는 중…";
       try {
-        const r = await sendJoin(id, msg.value.trim());
+        const r = await sendJoin(pickId, msg.value.trim(), guest);
+        const id = r.entry ? r.entry.id : pickId;
         open(id, r.already ? "already" : "new", r.entry);
         onEntered?.(id);
-      } catch { out.textContent = "전송에 실패했어요. 잠시 후 다시 눌러 주세요."; check(); }
+      } catch (err) { out.textContent = err.message === "full" ? "직접 입력 자리가 다 찼어요. 관리자에게 알려 주세요." : "전송에 실패했어요. 잠시 후 다시 눌러 주세요."; check(); }
     });
     fill(); check();
     showForm.fill = () => { fill(); check(); };
@@ -528,7 +570,7 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
   showForm();
   return {
     sync: () => { ready = true; sync(); },
-    focus: () => root.querySelector("select")?.focus(),
+    focus: () => root.querySelector("input[name=q]")?.focus(),
     reset: () => showForm(),
     chatlog: (items) => { chatItems = items.slice(-150); renderChat?.(); },
     chat: (m) => { chatItems.push(m); if (chatItems.length > 150) chatItems.shift(); renderChat?.(); },
@@ -540,7 +582,7 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
 const RAND_MSG = ["올해 정말 고생 많으셨어요!", "내년에도 잘 부탁드립니다 🙏", "다들 건강하세요!", "올해 최고의 팀이었어요 👏", "새해 복 많이 받으세요", "맛있는 거 먹으러 왔어요 🍗", "내년엔 더 재밌게!", "올 한 해 감사했습니다", "회식 2차 갑니다 🍻", "다들 사랑합니다 ❤️"];
 function adminRandom(entries, n = 5) {
   const here = entries?.() || new Map(), has = (i) => (here.has ? here.has(i) : here[i]);
-  const waiting = ALL.map((d) => d.id).filter((i) => !has(i));
+  const waiting = ALL.filter((d) => !d.guest).map((d) => d.id).filter((i) => !has(i));
   if (!waiting.length) { alert("모두 입장했어요."); return; }
   for (let i = 0; i < n && waiting.length; i++) {
     const pick = waiting.splice(Math.floor(Math.random() * waiting.length), 1)[0];
