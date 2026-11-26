@@ -87,8 +87,9 @@
   #show .up-2.done .cone, #show .up-2.done .dimmer, #show .up-2.done .up-c, #show .up-2.done > .sh-t { display: none; }
   #show .sh-prize { position: relative; }
   #show .coins { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
-  #show .coins i { position: absolute; left: -1.1cqw; top: -1.1cqw; width: 2.2cqw; height: 2.2cqw; border-radius: 50%; background: #ffd84a; box-shadow: inset -.35cqw -.35cqw 0 #c8941a, inset .25cqw .25cqw 0 #fff3b0, 0 0 0 .2cqw #8a5a10; animation: coin 1.3s cubic-bezier(.2,.7,.4,1) forwards; }
-  @keyframes coin { 0% { transform: translate(0, 0) scale(.3); opacity: 1; } 45% { transform: translate(calc(var(--x) * .8), var(--y)) rotate(calc(var(--r) * .5)) scale(1); opacity: 1; } 100% { transform: translate(var(--x), calc(var(--y) * -.2 + 22cqh)) rotate(var(--r)) scale(.9); opacity: 0; } }
+  #show .coins i { position: absolute; left: -1.2cqw; top: -1.2cqw; width: 2.4cqw; height: 2.4cqw; background: var(--coin) 0 0 / 400% 100%; image-rendering: pixelated; animation: coin 1.3s cubic-bezier(.2,.7,.4,1) forwards, spin .36s steps(4) infinite; }
+  @keyframes spin { to { background-position: -400% 0; } }
+  @keyframes coin { 0% { transform: translate(0, 0) scale(.3); opacity: 1; } 45% { transform: translate(calc(var(--x) * .8), var(--y)) scale(1); opacity: 1; } 100% { transform: translate(var(--x), calc(var(--y) * -.2 + 22cqh)) scale(.9); opacity: 0; } }
   #show .up-win { display: none; flex-direction: column; align-items: center; gap: 1.8cqh; }
   #show .up-2.done .up-win { display: flex; animation: zoomIn .9s cubic-bezier(.22,1,.36,1) both; }
   @keyframes zoomIn { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: none; } }

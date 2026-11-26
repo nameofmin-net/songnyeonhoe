@@ -1076,7 +1076,7 @@ async function startSpotlight(sh) {
   if (seq[seq.length - 1] === winIx) seq.push((winIx + 1) % els.length);
   seq.push(winIx);
   const [, fy] = pos(els[0]);
-  cone.style.height = fy + 8 + "px";
+  cone.style.height = `calc(${fy + 4}px + 9cqh)`;
   cone.style.opacity = 1;
   // 위에서 아래로 쏘는 원뿔 조명이 천천히 사람들을 훑고, 갈수록 더 느려진다
   for (let i = 0; i < seq.length; i++) {
@@ -1103,9 +1103,23 @@ function revealWinner(sh) {
   sfx.applause(3);
   people.find((p) => p.d.id === sh.winner)?.emote("party");
 }
+// 픽셀 동전 스프라이트(10×10, 4프레임 회전)
+const COIN_URL = (() => {
+  const c = document.createElement("canvas"); c.width = 40; c.height = 10; const g = c.getContext("2d");
+  const O = "#5a3a08", D = "#c8941a", M = "#ffd84a", L = "#fff3b0";
+  const frames = [
+    ["...OOOO...", "..OMMMMO..", ".OMLLMMDO.", "OMLMMMMDDO", "OMLMDDMMDO", "OMMMDDMMDO", "OMMMMMMDDO", ".OMMMMDDO.", "..ODDDDO..", "...OOOO..."],
+    ["....OOO...", "...OMMMO..", "...OLMDO..", "..OLMMDDO.", "..OLMMMDO.", "..OMMMMDO.", "..OMMMDDO.", "...OMMDO..", "...ODDDO..", "....OOO..."],
+    ["....OO....", "....OMO...", "....OLO...", "....OMO...", "....OMO...", "....OMO...", "....OMO...", "....ODO...", "....ODO...", "....OO...."],
+    ["...OOO....", "..OMMMO...", "..ODMLO...", ".ODDMMLO..", ".ODMMMLO..", ".ODMMMMO..", ".ODDMMMO..", "..ODMMO...", "..ODDDO...", "...OOO...."],
+  ];
+  frames.forEach((rows, f) => rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === ".") return; g.fillStyle = { O, D, M, L }[ch]; g.fillRect(f * 10 + x, y, 1, 1); })));
+  return c.toDataURL();
+})();
 // 상금이 나올 때 동전이 팡 튄다
 function coinBurst(el) {
   if (!el) return;
+  showEl.style.setProperty("--coin", `url(${COIN_URL})`);
   const box = document.createElement("div"); box.className = "coins";
   box.innerHTML = Array.from({ length: 26 }, (_, i) => { const an = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, sp = 9 + Math.random() * 14; return `<i style="--x:${(Math.cos(an) * sp).toFixed(1)}cqw;--y:${(Math.sin(an) * sp * 1.6).toFixed(1)}cqh;--r:${Math.round(Math.random() * 720 - 360)}deg;animation-delay:${(i * 0.012).toFixed(3)}s"></i>`; }).join("");
   el.appendChild(box); sfx.coins(); setTimeout(() => box.remove(), 1800);
