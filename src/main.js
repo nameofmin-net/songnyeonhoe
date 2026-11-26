@@ -928,51 +928,51 @@ const treeFromRow = () => (tree.gone ? bigTree.h : tree.boom < 0 ? 0 : Math.ceil
 // ---------- 이스터에그: 단상 뒤 출입문 더블클릭 → 유플리트 사옥 ⇄ 광장 ----------
 officeScene = null;
 const OFFICE = officeLayout(W, H);
-// 사옥 왼쪽 위 LED 스크린에 유튜브 영상(?yt=영상ID 또는 링크, 없으면 기본 영상)
-const TV_DEFAULT = "AGGhnmnLqKU";
-function ytId(v) { if (!v) return ""; const m = String(v).match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/); return m ? m[1] : /^[\w-]{11}$/.test(v) ? v : ""; }
-let tvBox = null, tvPlaying = false, tvId = "";
-// 크롬은 사용자 조작 없이 소리를 켜면 영상을 멈춰 버린다 → 음소거로 먼저 재생하고, 화면을 처음 누를 때 소리를 켠다
-let tvUnmuted = 0, tvTryUnmute = 0, tvUnmuteAt = 0;
-addEventListener("pointerdown", () => { if (tvBox && !tvUnmuted) { tvUnmuted = performance.now(); tvCmd("unMute"); tvCmd("setVolume", [80]); tvCmd("playVideo"); tvPlaying = true; } }, true);
-const TV_POS_KEY = () => "songnyeonhoe-ytpos-" + tvId;
-function tvCmd(func, args = []) { const f = tvBox?.querySelector("iframe"); f?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*"); }
-// 영상 상태 듣기(자동재생 됐는지 알기 위해)
-addEventListener("message", (e) => { if (!String(e.origin).includes("youtube")) return; try { const m = JSON.parse(e.data); const st = m.info?.playerState; if (st !== undefined) { tvPlaying = st === 1 || st === 3;
-      // 음소거로 재생이 시작되면 소리 켜기를 시도하고, 크롬이 그 때문에 멈추면 다시 음소거로 재생
-      if (st === 1 && tvTryUnmute && performance.now() > tvTryUnmute - 1500) { tvTryUnmute = 0; tvUnmuteAt = performance.now(); tvCmd("unMute"); tvCmd("setVolume", [80]); }
-      else if (st === 2 && performance.now() - tvUnmuteAt < 2500) { tvUnmuteAt = 0; tvCmd("mute"); tvCmd("playVideo"); } } const ct = m.info?.currentTime; if (typeof ct === "number" && ct > 1) { try { localStorage.setItem(TV_POS_KEY(), String(Math.floor(ct))); } catch {} } } catch {} });
+// 사옥 왼쪽 위 LED 스크린: 음악(mp3)을 틀고 화면엔 픽셀 이퀄라이저. 재생 위치는 이 기기에 기억
+const TV_SRC = "audio/office.mp3", TV_POS = "songnyeonhoe-mp3pos";
+let tvBox = null, tvAudio = null, tvRaf = 0, tvSaved = 0;
+function tvPlay() { if (!tvAudio) return; tvAudio.volume = 0.8; tvAudio.muted = false; tvAudio.play().catch(() => { tvAudio.muted = true; tvAudio.play().catch(() => {}); }); }
+// 크롬은 사용자 조작 전엔 소리 재생을 막는다 → 막히면 음소거로 돌리다가 화면을 처음 누를 때 소리를 켠다
+let tvUnmuted = 0;
+addEventListener("pointerdown", () => { if (tvAudio && (tvAudio.muted || tvAudio.paused) && !tvUnmuted) { tvUnmuted = performance.now(); tvPlay(); } }, true);
 function tvToggle() {
-  if (performance.now() - tvUnmuted < 400) return; // 방금 첫 터치로 소리를 켠 경우
-  if (!tvBox) return;
-  if (tvPlaying) { tvCmd("pauseVideo"); tvPlaying = false; } else { tvCmd("unMute"); tvCmd("setVolume", [80]); tvCmd("playVideo"); tvPlaying = true; }
+  if (!tvAudio || performance.now() - tvUnmuted < 400) return;
+  if (tvAudio.paused || tvAudio.muted) tvPlay(); else tvAudio.pause();
   sfx.blip();
 }
 function hitTv(x, y) { const lw = Math.min(110, Math.round(W * 0.22)); return officeOn && x >= 6 && x <= 10 + lw && y >= 3 && y <= 39; }
 function setTv(on) {
-  const id = ytId(params.get("yt")) || ytId((() => { try { return localStorage.getItem("songnyeonhoe-yt"); } catch { return ""; } })()) || TV_DEFAULT;
-  tvBox?.remove(); tvBox = null;
-  if (!on || !id) return;
-  tvId = id;
-  let start = 0; try { start = Math.max(0, (+localStorage.getItem(TV_POS_KEY()) || 0) - 2); } catch {}
-  const lw = Math.min(110, Math.round(W * 0.22));
+  cancelAnimationFrame(tvRaf); tvBox?.remove(); tvBox = null;
+  if (tvAudio) { try { localStorage.setItem(TV_POS, String(tvAudio.currentTime)); } catch {} tvAudio.pause(); tvAudio.src = ""; tvAudio = null; }
+  if (!on) return;
+  const lw = Math.min(110, Math.round(W * 0.22)), lh = 32;
   tvBox = document.createElement("div");
-  Object.assign(tvBox.style, { position: "absolute", left: 8 * S + "px", top: 5 * S + "px", width: lw * S + "px", height: 32 * S + "px", overflow: "hidden", zIndex: 1, pointerEvents: "none", background: "#000" });
-  const w = lw * S, h = w * 9 / 16;
-  // 픽셀 필터(SVG): 블록 하나 = 월드 픽셀 1칸 → 광장과 같은 도트감
-  const B = Math.max(2, Math.round(S)), hB = B / 2;
-  const svg = `<svg width="0" height="0" style="position:absolute"><filter id="tvpx" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feFlood x="${hB}" y="${hB}" width="1" height="1"/><feComposite width="${B}" height="${B}"/><feTile result="a"/><feComposite in="SourceGraphic" in2="a" operator="in"/><feMorphology operator="dilate" radius="${Math.ceil(hB)}"/></filter></svg>`;
-  tvBox.innerHTML = svg + `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=${navigator.userActivation?.hasBeenActive ? 0 : 1}&loop=1&playlist=${id}&controls=0&modestbranding=1&playsinline=1&rel=0&enablejsapi=1&start=${start}&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media" style="position:absolute;left:0;top:${(32 * S - h) / 2}px;width:${w}px;height:${h}px;border:0"></iframe>`;
-  stage.appendChild(tvBox);
-  tvPlaying = false;
-  const f = tvBox.querySelector("iframe");
-  f.addEventListener("load", () => { f.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: 1 }), "*"); setTimeout(() => { tvCmd("playVideo"); tvTryUnmute = performance.now() + 1500; }, 600); });
-  // 교차 출처 영상엔 픽셀 필터가 안 먹어서, LED 전광판처럼 도트 격자를 덮는다
-  const grid = document.createElement("div");
-  Object.assign(grid.style, { position: "absolute", inset: 0, pointerEvents: "none",
-    backgroundImage: `linear-gradient(to right, rgba(10,8,16,.55) 1px, transparent 1px), linear-gradient(to bottom, rgba(10,8,16,.55) 1px, transparent 1px), radial-gradient(circle at 50% 50%, transparent 55%, rgba(10,8,16,.35) 100%)`,
-    backgroundSize: `${B}px ${B}px, ${B}px ${B}px, ${B}px ${B}px` });
-  tvBox.appendChild(grid);
+  Object.assign(tvBox.style, { position: "absolute", left: 8 * S + "px", top: 5 * S + "px", width: lw * S + "px", height: lh * S + "px", overflow: "hidden", zIndex: 1, pointerEvents: "none" });
+  const cv = document.createElement("canvas"); cv.width = lw; cv.height = lh;
+  Object.assign(cv.style, { width: "100%", height: "100%", imageRendering: "pixelated" });
+  tvBox.appendChild(cv); stage.appendChild(tvBox);
+  tvAudio = new Audio(TV_SRC); tvAudio.loop = true; tvAudio.preload = "auto";
+  try { const p = +localStorage.getItem(TV_POS) || 0; if (p > 3) tvAudio.addEventListener("loadedmetadata", () => { tvAudio.currentTime = Math.max(0, p - 2) % (tvAudio.duration || 1e9); }, { once: true }); } catch {}
+  tvPlay();
+  // 픽셀 이퀄라이저(가벼운 가짜 막대, 15fps)
+  const g = cv.getContext("2d"), N = Math.floor((lw - 8) / 4), lv = new Array(N).fill(0);
+  let lastT = 0;
+  const draw = (t) => {
+    tvRaf = requestAnimationFrame(draw);
+    if (t - lastT < 66) return; lastT = t;
+    const play = tvAudio && !tvAudio.paused && !tvAudio.muted;
+    if (tvAudio && t - tvSaved > 3000 && !tvAudio.paused) { tvSaved = t; try { localStorage.setItem(TV_POS, String(tvAudio.currentTime)); } catch {} }
+    g.fillStyle = "#0b0a14"; g.fillRect(0, 0, lw, lh);
+    for (let i = 0; i < N; i++) {
+      const target = play ? (0.25 + 0.75 * Math.abs(Math.sin(t / 260 * (0.6 + (i % 5) * 0.23) + i * 1.7)) * (0.55 + 0.45 * Math.random())) * (1 - i / N * 0.35) : 0.06;
+      lv[i] += (target - lv[i]) * 0.5;
+      const hgt = Math.max(1, Math.round(lv[i] * (lh - 10)));
+      for (let y = 0; y < hgt; y += 2) { const k = y / (lh - 10); g.fillStyle = k > 0.75 ? "#ff5a6a" : k > 0.5 ? "#ffd84a" : "#3ad0ff"; g.fillRect(4 + i * 4, lh - 4 - y, 3, 1); }
+    }
+    g.fillStyle = play ? "#ffffff" : "#8a8aa0"; g.font = "6px monospace"; g.textBaseline = "top";
+    g.fillText(play ? "♪ NOW PLAYING" : tvAudio?.muted ? "▶ CLICK FOR SOUND" : "❚❚ PAUSED", 4, 2);
+  };
+  tvRaf = requestAnimationFrame(draw);
 }
 const OFFICE_LINES = {
   sofa: { hi: ["아 푹신하다~", "여기 명당이네요", "잠깐 쉬었다 갈게요 😌", "이 소파 진짜 편해"], mid: ["쿠션 색 예쁘다", "5분만 눈 붙일까…", "여기서 회의해도 되겠다", "올해 진짜 바빴죠?"], bye: ["자, 다시 일하러!", "충전 완료 💪"] },
