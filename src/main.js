@@ -1325,6 +1325,7 @@ function renderQuizBar() {
   const q = quizSt.q, el = $("#quizBar"); if (!q) return;
   const c = { O: 0, X: 0 }; Object.values(quizSt.votes).forEach((v) => c[v]++);
   if (q.phase === "end") { el.innerHTML = `<b>🏁 OX 퀴즈 끝!</b><span>모두 수고했어요</span>`; return; }
+  if (q.phase === "ready") { el.innerHTML = `<small>OX QUIZ</small><b>곧 시작합니다!</b><span>휴대폰을 준비해 주세요 📱</span>`; return; }
   el.innerHTML = `<small>Q${q.idx + 1}${q.total ? ` / ${q.total}` : ""}</small><b>${esc(q.q)}</b>${q.phase === "reveal" ? `<i class="ans ${q.a === "O" ? "o" : "x"}">정답 ${q.a === "O" ? "⭕" : "❌"}</i>` : ""}<span>⭕ ${c.O} · ❌ ${c.X}</span>`;
 }
 

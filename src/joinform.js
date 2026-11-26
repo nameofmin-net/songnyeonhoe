@@ -372,6 +372,7 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
         mob.classList.toggle("quizzing", !!q);
         qbox.hidden = !q;
         if (!q) return;
+        if (q.phase === "ready") { qbox.innerHTML = `<div class="qz-end">⭕❌ OX 퀴즈 운동장에 도착!<br><small>곧 첫 문제가 나와요. 휴대폰을 들고 기다려 주세요</small></div>`; return; }
         if (q.phase === "end") { qbox.innerHTML = `<div class="qz-end">🏁 모든 문제가 끝났어요!<br><small>광장 화면을 봐 주세요</small></div>`; return; }
         const pick = myPick[q.idx], out = (q.out || []).includes(id) && !(q.phase === "reveal" && pick), rev = q.phase === "reveal" || out;
         const res = out ? `<b class="ng">탈락했어요 💀 구경 모드</b>` : rev ? (pick ? (pick === q.a ? `<b class="ok">⭕ 정답! 살아남았어요 🎉</b>` : `<b class="ng">탈락… 💀</b>`) : `<b class="ng">투표 안 했어요</b>`) : pick ? `${pick} 쪽으로 이동했어요` : "O 또는 X를 골라 주세요";

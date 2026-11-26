@@ -131,7 +131,7 @@ export function mountController({ entries }) {
         </div>
         <div class="card base ${quiz ? "live" : ""}">
           <h4>⭕❌ OX 퀴즈 <small>기본 메뉴</small></h4>
-          <p>광장이 운동장으로 바뀌고 모두 츄리닝 차림이 돼요. 휴대폰엔 문제와 O·X 버튼이 떠요.<br>문제 ${quizQs.length}개${quiz ? `<br><b>● 진행 중 — ${quiz.phase === "end" ? "모든 문제 끝" : `${quiz.idx + 1}번 문제 ${quiz.phase === "ask" ? "투표 중" : "정답 공개"}`}</b>` : ""}</p>
+          <p>광장이 운동장으로 바뀌고 모두 츄리닝 차림이 돼요. 휴대폰엔 문제와 O·X 버튼이 떠요.<br>문제 ${quizQs.length}개${quiz ? `<br><b>● 진행 중 — ${quiz.phase === "end" ? "모든 문제 끝" : quiz.phase === "ready" ? "대기 중(운동장)" : `${quiz.idx + 1}번 문제 ${quiz.phase === "ask" ? "투표 중" : "정답 공개"}`}</b>` : ""}</p>
           ${quiz ? quizRemoteHTML() : `<div class="row"><button class="ghost" data-a="qedit">문제 설정</button><button class="big" data-a="qstart" ${busy || !quizQs.length ? "disabled" : ""}>▶ 시작</button></div>`}
         </div>
         <button class="big" data-a="new">＋ 새 메뉴 만들기</button>
@@ -149,6 +149,9 @@ export function mountController({ entries }) {
   function quizRemoteHTML() {
     const c = { O: 0, X: 0 }; Object.values(votes).forEach((v) => c[v]++);
     const q = quizQs[quiz.idx];
+    if (quiz.phase === "ready") return `<p style="color:#fff;font-size:14px">운동장으로 이동했어요. 모두 모이면 시작하세요.</p>
+      <button class="big next" data-a="qnext" ${busy ? "disabled" : ""}>첫 문제 시작 ▶</button>
+      <div class="row"><button class="big red" data-a="qstop" ${busy ? "disabled" : ""}>■ 퀴즈 끝내기 (광장으로)</button></div>`;
     return `<p style="color:#fff;font-size:14px">Q${quiz.idx + 1}/${quizQs.length}. ${esc(quiz.q)}<br><span style="color:#9a90b0">정답 ${q ? q.a : "?"} · 지금 ⭕ ${c.O}명 / ❌ ${c.X}명</span></p>
       ${quiz.phase === "ask" ? `<button class="big next" data-a="qreveal" ${busy ? "disabled" : ""}>정답 공개</button>` : quiz.phase === "reveal" ? `<button class="big next" data-a="qnext" ${busy ? "disabled" : ""}>${quiz.idx + 1 < quizQs.length ? "다음 문제 ▶" : "마무리 ▶"}</button>` : ""}
       <div class="row"><button class="big red" data-a="qstop" ${busy ? "disabled" : ""}>■ 퀴즈 끝내기 (광장으로)</button></div>`;
