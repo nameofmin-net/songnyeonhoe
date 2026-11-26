@@ -741,7 +741,10 @@ function chats() {
 }
 
 let last = performance.now();
+// ?fps=30 처럼 주면 그 프레임 수로 제한(약한 기기·송출용)
+const FPS_CAP = Math.max(0, +new URLSearchParams(location.search).get("fps") || 0);
 function tick(nowMs) {
+  if (FPS_CAP && nowMs - last < 1000 / FPS_CAP - 3) { requestAnimationFrame(tick); return; }
   const dt = Math.min(0.05, (nowMs - last) / 1000); last = nowMs;
   const now = nowMs / 1000;
   for (const r of people) r.update(dt, now);
