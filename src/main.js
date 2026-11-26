@@ -928,10 +928,11 @@ const OFFICE = officeLayout(W, H);
 // 사옥 왼쪽 위 LED 스크린에 유튜브 영상(?yt=영상ID 또는 링크, 없으면 기본 영상)
 const TV_DEFAULT = "q-ZFpbrokMg";
 function ytId(v) { if (!v) return ""; const m = String(v).match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/); return m ? m[1] : /^[\w-]{11}$/.test(v) ? v : ""; }
-let tvBox = null, tvPlaying = false;
+let tvBox = null, tvPlaying = false, tvId = "";
+const TV_POS_KEY = () => "songnyeonhoe-ytpos-" + tvId;
 function tvCmd(func, args = []) { const f = tvBox?.querySelector("iframe"); f?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*"); }
 // 영상 상태 듣기(자동재생 됐는지 알기 위해)
-addEventListener("message", (e) => { if (!String(e.origin).includes("youtube")) return; try { const m = JSON.parse(e.data); const st = m.info?.playerState; if (st !== undefined) tvPlaying = st === 1 || st === 3; } catch {} });
+addEventListener("message", (e) => { if (!String(e.origin).includes("youtube")) return; try { const m = JSON.parse(e.data); const st = m.info?.playerState; if (st !== undefined) tvPlaying = st === 1 || st === 3; const ct = m.info?.currentTime; if (typeof ct === "number" && ct > 1) { try { localStorage.setItem(TV_POS_KEY(), String(Math.floor(ct))); } catch {} } } catch {} });
 function tvToggle() {
   if (!tvBox) return;
   if (tvPlaying) { tvCmd("pauseVideo"); tvPlaying = false; } else { tvCmd("unMute"); tvCmd("setVolume", [80]); tvCmd("playVideo"); tvPlaying = true; }
@@ -941,6 +942,8 @@ function hitTv(x, y) { const lw = Math.min(110, Math.round(W * 0.22)); return of
 function setTv(on) {
   const id = ytId(params.get("yt")) || ytId((() => { try { return localStorage.getItem("songnyeonhoe-yt"); } catch { return ""; } })()) || TV_DEFAULT;
   if (!on || !id) { tvBox?.remove(); tvBox = null; return; }
+  tvId = id;
+  let start = 0; try { start = Math.max(0, (+localStorage.getItem(TV_POS_KEY()) || 0) - 2); } catch {}
   const lw = Math.min(110, Math.round(W * 0.22));
   tvBox = document.createElement("div");
   Object.assign(tvBox.style, { position: "absolute", left: 8 * S + "px", top: 5 * S + "px", width: lw * S + "px", height: 32 * S + "px", overflow: "hidden", zIndex: 1, pointerEvents: "none", background: "#000" });
@@ -948,7 +951,7 @@ function setTv(on) {
   // 픽셀 필터(SVG): 블록 하나 = 월드 픽셀 1칸 → 광장과 같은 도트감
   const B = Math.max(2, Math.round(S)), hB = B / 2;
   const svg = `<svg width="0" height="0" style="position:absolute"><filter id="tvpx" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feFlood x="${hB}" y="${hB}" width="1" height="1"/><feComposite width="${B}" height="${B}"/><feTile result="a"/><feComposite in="SourceGraphic" in2="a" operator="in"/><feMorphology operator="dilate" radius="${Math.ceil(hB)}"/></filter></svg>`;
-  tvBox.innerHTML = svg + `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=0&loop=1&playlist=${id}&controls=0&modestbranding=1&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media" style="position:absolute;left:0;top:${(32 * S - h) / 2}px;width:${w}px;height:${h}px;border:0"></iframe>`;
+  tvBox.innerHTML = svg + `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=0&loop=1&playlist=${id}&controls=0&modestbranding=1&playsinline=1&rel=0&enablejsapi=1&start=${start}&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media" style="position:absolute;left:0;top:${(32 * S - h) / 2}px;width:${w}px;height:${h}px;border:0"></iframe>`;
   stage.appendChild(tvBox);
   tvPlaying = false;
   const f = tvBox.querySelector("iframe");
