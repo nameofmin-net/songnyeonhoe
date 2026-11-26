@@ -925,7 +925,7 @@ const treeFromRow = () => (tree.gone ? bigTree.h : tree.boom < 0 ? 0 : Math.ceil
 officeScene = null;
 const OFFICE = officeLayout(W, H);
 // 사옥 왼쪽 위 LED 스크린에 유튜브 영상(?yt=영상ID 또는 링크, 없으면 기본 영상)
-const TV_DEFAULT = "";
+const TV_DEFAULT = "q-ZFpbrokMg";
 function ytId(v) { if (!v) return ""; const m = String(v).match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/); return m ? m[1] : /^[\w-]{11}$/.test(v) ? v : ""; }
 let tvBox = null;
 function setTv(on) {
