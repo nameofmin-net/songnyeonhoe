@@ -388,6 +388,7 @@ class Resident {
     this.entering = 0;
   }
   draw() {
+    if (this.zapped) return;
     if (this.hidden) { for (const f of this.fx) f.fx.draw(frame, "back"); return; }
     const walking = this.state === "walk";
     const step = walking ? Math.floor(this.t * 7) % 4 : 0;
@@ -419,6 +420,7 @@ class Resident {
     }
   }
   drawFront() {
+    if (this.zapped) return;
     if (this.spo && !this.hidden) drawSpecial(painterFor(frame), this.style.sp, "front", this.spo);
     for (const f of this.fx) f.fx.draw(frame, "front");
     if (this.icon) {
@@ -518,7 +520,7 @@ function drawOverlay() {
   // 이름표
   c.font = `${nameF}px Galmuri14, "Apple SD Gothic Neo", sans-serif`;
   for (const r of list) {
-    if (r.hidden || r.state === "ride" || r.state === "sit") continue;
+    if (r.hidden || r.zapped || r.state === "ride" || r.state === "sit") continue;
     const x = r.x * S, y = (r.y + 3) * S + nameF * 0.6;
     const label = quizOn() && !r.d.npc ? `${String(r.d.id + 1).padStart(3, "0")} ${r.name}` : r.name;
     const tw = c.measureText(label).width + 10;
@@ -530,7 +532,7 @@ function drawOverlay() {
   // 말풍선
   c.font = `${talkF}px Galmuri14, "Apple SD Gothic Neo", sans-serif`;
   for (const r of list) {
-    if (!r.speech) continue;
+    if (!r.speech || r.zapped) continue;
     const x = r.x * S, top = (r.y - SH - 4 - (r.state === "ride" ? r.lift + 2 : 0)) * S - (r.icon ? 14 * S : 0) - (r.beering ? 18 * S : 0);
     const lines = wrap(c, r.speech.text, talkF * 11), lh = talkF * 1.35;
     const tw = Math.max(...lines.map((l) => c.measureText(l).width)) + talkF * 1.4, th = lh * lines.length + talkF * 0.8;
@@ -634,7 +636,8 @@ function arrive(id, message, { silent = false, at = Date.now() } = {}) {
   const r = new Resident(ALL[id], message);
   people.push(r);
   if (!silent) { r.enter(); announce(id, message); sfx.enter(); }
-  if (ceremony.on) setTimeout(() => { if (ceremony.on && !r.seat) { if (r.d.name === CEO_NAME) seatEveryoneOne(r); else { const taken = people.filter((p) => p.seat).map((p) => p.seat); const s = seatsFor(people.length).find((q) => !taken.some((t) => Math.abs(t.x - q.x) < 2 && Math.abs(t.y - q.y) < 2)); if (s) r.seat = { x: s.x, y: s.y }; } } }, silent ? 0 : 4500);
+  if (quizOn()) { r.x = W / 2 + (Math.random() - 0.5) * 60; r.y = H - 24; placeQuiz(r); }
+  else if (ceremony.on) setTimeout(() => { if (ceremony.on && !r.seat) { if (r.d.name === CEO_NAME) seatEveryoneOne(r); else { const taken = people.filter((p) => p.seat).map((p) => p.seat); const s = seatsFor(people.length).find((q) => !taken.some((t) => Math.abs(t.x - q.x) < 2 && Math.abs(t.y - q.y) < 2)); if (s) r.seat = { x: s.x, y: s.y }; } } }, silent ? 0 : 4500);
   else r.timer = rnd(0.3, 3);
   renderLists(silent ? -1 : id);
 }
@@ -706,6 +709,17 @@ function tick(nowMs) {
   const Q = quizOn();
   if (Q) frame.light.set(quizScene.light); else drawGarland(now);
   if (Q) drawDoll(painterFor(frame), CX, WALL + 6, quizSt.dollFront, quizSt.dollFront && quizSt.q?.phase === "reveal", now);
+  if (Q && quizSt.laser) {
+    const L = quizSt.laser; L.t += dt;
+    const p = painterFor(frame), tx = L.r.x, ty = L.r.y - 14, a = Math.max(0, 1 - L.t / 0.3);
+    for (const ex of [CX - 5.5, CX + 5.5]) {
+      const ey = WALL + 6 - 76 + 16.5;
+      p.line(ex, ey, tx, ty, C("#ff3030"), a); p.line(ex + 1, ey, tx + 1, ty, C("#ffd0d0"), a);
+      p.glowLine(ex, ey, tx, ty, 3, C("#ff2020"), 0.8 * a);
+    }
+    p.glow(tx, ty, 10, C("#ff4040"), 0.8 * a);
+    if (L.t > 0.3) quizSt.laser = null;
+  }
   const items = [...people.map((r) => ({ y: r.onStage ? 104.5 : r.y, r })), ...(Q ? [] : props.map((p) => ({ y: p.y, p })))];
   items.sort((a, b) => a.y - b.y);
   for (const it of items) {
@@ -1206,7 +1220,8 @@ function applyQuiz(q, votes) {
     for (const r of people) { r.cache.clear(); r.actor = actorFor(r.sprite(0, 0, false)); }
     if (quizOn()) { setTrack("quiz"); sfx.curtain(); for (const r of people) { r.speech = null; placeQuiz(r); } $("#quizBar").hidden = false; }
     else {
-      setTrack("carol"); $("#quizBar").hidden = true;
+      setTrack("carol"); $("#quizBar").hidden = true; quizSt.laser = null;
+      for (const r of people) r.zapped = false;
       for (const r of people) { r.seat = null; r.state = "idle"; r.timer = Math.random() * 2; let k = 0; while (blocked(r.x, r.y) && k++ < 80) { r.y += 2; if (r.y > H - 10) { r.y = FLOOR_TOP + 20; r.x = 40 + Math.random() * (W - 80); } } }
       if (ceremony?.on) seatEveryone();
       return;
@@ -1217,18 +1232,25 @@ function applyQuiz(q, votes) {
   // 새 문제: 모두 가운데로, 인형은 뒤돌아 노래
   if (Qn.idx !== prevIdx || (Qn.phase === "ask" && prevPhase !== "ask")) {
     quizSt.dollFront = false;
-    for (const r of people) { placeQuiz(r); r.fx = r.fx.filter((f) => !f.loop); }
+    for (const r of people) { if (r.zapped) { r.zapped = false; r.x = W / 2 + (Math.random() - 0.5) * 60; r.y = H - 20; } placeQuiz(r); r.fx = r.fx.filter((f) => !f.loop); }
     sfx.drumroll(0.6);
   }
   if (Qn.phase === "reveal" && prevPhase !== "reveal") {
     quizSt.dollFront = true; sfx.boom();
     setTimeout(() => {
+      const losers = [];
       for (const r of people) {
         if (r.d.npc) continue;
         const v = quizSt.votes[r.d.id];
-        if (v === Qn.a) r.emote("party"); else if (v) { r.play(FX.stunned, true, 4); r.say("으악! 💀", 2.5); } 
+        if (v === Qn.a) r.emote("party"); else if (v) { losers.push(r); r.say("헉…! 😱", 2); }
       }
-      sfx.fanfare();
+      if (!losers.length) sfx.fanfare();
+      // 인형 눈에서 레이저: 오답자를 한 명씩 빠르게
+      losers.sort(() => Math.random() - 0.5).forEach((r, i) => setTimeout(() => {
+        if (!quizOn() || r.zapped) return;
+        quizSt.laser = { r, t: 0 }; sfx.laser(); r.speech = null;
+        setTimeout(() => { if (r.last) dissolve(r); r.zapped = true; sfx.dust(); }, 140);
+      }, 700 + i * 260));
     }, 900);
   }
   renderQuizBar();

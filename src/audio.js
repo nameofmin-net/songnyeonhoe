@@ -106,6 +106,8 @@ export const sfx = {
     noise(sfxBus, { dur: 1.8, vol: 0.12, type: "highpass", f: 7000 });
     ["C6", "E6", "G6", "C7"].forEach((n) => bell(hz(midi(n)), 1.85, 0.22, 1.4));
   },
+  /** 레이저 피융 */
+  laser() { if (ok("laser", 80)) { tone(sfxBus, { f: 2400, f2: 300, dur: 0.22, type: "sawtooth", vol: 0.18, cut: 5000 }); noise(sfxBus, { dur: 0.12, vol: 0.2, type: "highpass", f: 3000 }); } },
   /** 동전 짤랑 */
   coins() { if (ok("coins", 400)) for (let i = 0; i < 9; i++) { const f = 2600 + Math.random() * 1800, t = i * 0.05 + Math.random() * 0.03; tone(sfxBus, { f, t, dur: 0.18, vol: 0.12, type: "square", cut: 6000 }); tone(sfxBus, { f: f * 1.5, t: t + 0.03, dur: 0.12, vol: 0.06 }); } },
   /** 커튼 쓸리는 소리 */
