@@ -968,18 +968,16 @@ function startWalkers(quiet = false) {
         step = u > 0 ? Math.floor(w.t * 8) % 4 : 0;
         bob = step % 2 ? -1 : 0;
       } else {
-        if (!w.arrived) { w.arrived = true; w.el.classList.add("here"); w.hop = 0.5; w.next = 0.4 + Math.random() * 1.2; }
+        if (!w.arrived) { w.arrived = true; w.el.classList.add("here"); w.next = 0.4 + Math.random() * 1.2; }
         w.x = 0; dir = 0; flip = false;
         // 기쁨 루프: 폴짝 + 대사 또는 이모티콘
         w.next -= dt;
         const party = showEl.classList.contains("s2");
         if (w.next <= 0 && !(quiet && !w.el.classList.contains("win"))) {
-          w.hop = 0.55;
           if (Math.random() < 0.5) { w.bub.textContent = choose(HAPPY); w.bub.classList.add("on"); clearTimeout(w.bt); w.bt = setTimeout(() => w.bub.classList.remove("on"), 1800); }
           else { w.emo.textContent = choose(HAPPY_EMO); w.emo.classList.remove("on"); void w.emo.offsetWidth; w.emo.classList.add("on"); }
           w.next = party ? 0.9 + Math.random() * 1.2 : 2.2 + Math.random() * 2.8;
         }
-        if (party && Math.random() < dt * 2) w.hop = Math.max(w.hop, 0.4);
       }
       if (w.hop > 0) { w.hop -= dt; bob = -Math.round(Math.abs(Math.sin((0.55 - w.hop) / 0.55 * Math.PI)) * 4); }
       w.el.style.transform = `translate(${w.x.toFixed(1)}px, ${bob * (w.el.offsetHeight / 40)}px)`;
@@ -1078,20 +1076,30 @@ async function startSpotlight(sh) {
   const [, fy] = pos(els[0]);
   cone.style.height = `calc(${fy + 4}px + 9cqh)`;
   cone.style.opacity = 1;
-  // 위에서 아래로 쏘는 원뿔 조명이 천천히 사람들을 훑고, 갈수록 더 느려진다
-  for (let i = 0; i < seq.length; i++) {
-    const [x] = pos(els[seq[i]]), last = i === seq.length - 1;
-    const dur = 420 + Math.pow(i / seq.length, 2) * 1300 + (last ? 700 : 0);
-    cone.style.transition = `transform ${dur}ms cubic-bezier(.45,0,.25,1)`;
-    cone.style.transform = `translateX(${x}px)`;
-    els.forEach((e) => e.classList.remove("lit"));
-    setTimeout(() => { els.forEach((e) => e.classList.remove("lit")); els[seq[i]].classList.add("lit"); sfx.blip(); }, dur * 0.8);
-    await wait(dur + (last ? 900 : 160));
-    if (!showCur || showCur.step !== 2) return;
-  }
+  // 원뿔 조명이 줄 위를 부드럽게 좌우로 훑다가 점점 느려지며 수상자에서 멈춘다
+  const xs = els.map((e) => pos(e)[0]), lo = Math.min(...xs) - 10, hi = Math.max(...xs) + 10, mid = (lo + hi) / 2, amp = (hi - lo) / 2;
+  const wx = xs[winIx], T = 9000;
+  cone.style.transition = "none";
+  await new Promise((done) => {
+    const t0 = performance.now(); let ph = Math.random() * 6.28, lastT = t0;
+    const sm = (a, b, x) => { const k = Math.max(0, Math.min(1, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
+    const step = (ms) => {
+      if (!showCur || showCur.step !== 2) return done();
+      const u = Math.min(1, (ms - t0) / T), dt = (ms - lastT) / 1000; lastT = ms;
+      ph += dt * (3.2 - 2.6 * u); // 점점 느려짐
+      const sweep = mid + amp * Math.sin(ph), k = sm(0.72, 1, u);
+      const cxNow = sweep * (1 - k) + wx * k;
+      cone.style.transform = `translateX(${cxNow.toFixed(1)}px)`;
+      // 빛 안에 들어온 사람만 밝게(빛의 폭에 따라 부드럽게)
+      els.forEach((e, i) => { const l = Math.max(0, 1 - Math.abs(xs[i] - cxNow) / (cone.offsetWidth * 0.42)); e.style.filter = `brightness(${(0.28 + 0.95 * l).toFixed(2)})`; });
+      if (u < 1) requestAnimationFrame(step); else setTimeout(done, 700);
+    };
+    requestAnimationFrame(step);
+  });
+  if (!showCur || showCur.step !== 2) return;
   // 쾅! 수상자만 남기
   sfx.fanfare(); panel.classList.add("hit");
-  els.forEach((e, i) => { if (i !== winIx) e.classList.add("lose"); else e.classList.add("win", "lit"); });
+  els.forEach((e, i) => { e.style.filter = ""; if (i !== winIx) e.classList.add("lose"); else e.classList.add("win", "lit"); });
   await wait(1500);
   revealWinner(sh);
 }
