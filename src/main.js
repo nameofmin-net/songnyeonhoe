@@ -1311,8 +1311,10 @@ function applyQuiz(q, votes) {
       setTimeout(() => losers.slice(nZap).forEach((r) => {
         if (!quizOn() || r.zapped) return;
         // 가장 가까운 화면 가장자리로 전력질주
-        const dl = r.x, dr = W - r.x, db = H - r.y;
-        const ex = Math.min(dl, dr, db) === db ? { x: r.x + (Math.random() - 0.5) * 60, y: H + 40 } : dl < dr ? { x: -40, y: r.y + (Math.random() - 0.5) * 40 } : { x: W + 40, y: r.y + (Math.random() - 0.5) * 40 };
+        // 사방으로 흩어져 도망: 왼쪽·오른쪽·아래·담장 넘어 위쪽 중 무작위(가까운 쪽 가중)
+        const opts = [{ x: -40, y: r.y + (Math.random() - 0.5) * 120, w: 1.5 - r.x / W }, { x: W + 40, y: r.y + (Math.random() - 0.5) * 120, w: 0.5 + r.x / W }, { x: r.x + (Math.random() - 0.5) * 220, y: H + 40, w: 0.8 }, { x: r.x + (Math.random() - 0.5) * 260, y: -40, w: 0.7 }];
+        let k = Math.random() * opts.reduce((a, o) => a + o.w, 0), ex = opts[0];
+        for (const o of opts) { if ((k -= o.w) <= 0) { ex = o; break; } }
         r.seat = { x: ex.x, y: ex.y, stand: true, fast: true, flee: true }; r.timer = 0; r.state = "walk"; r.fx = r.fx.filter((f) => !f.loop);
         r.speed = Math.max(r.speed, 26); r.say(choose(["도망쳐!!", "살려줘요 😱", "으아아악", "엄마!!"]), 1.6);
       }), 500);
