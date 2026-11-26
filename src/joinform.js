@@ -186,10 +186,10 @@ const CSS = `
 /* 버튼 프레스 인터랙션 (채팅·메뉴·컨트롤러 공통) */
 button, .btn, [data-act], [data-emo] { -webkit-tap-highlight-color: transparent; touch-action: manipulation; user-select: none; -webkit-user-select: none; transition: transform .12s cubic-bezier(.22,1,.36,1), box-shadow .12s, filter .15s, background-color .15s; }
 @media (hover: hover) { button:hover:not(:disabled), .btn:hover { filter: brightness(1.12); } }
-button:active:not(:disabled), .btn:active { transform: translateY(3px) scale(.96); filter: brightness(.92); box-shadow: 0 1px 0 #00000066 !important; transition-duration: .04s; }
-.mob-emo button:active i { display: inline-block; transform: scale(1.35) rotate(-8deg); }
+button.down:not(:disabled), .btn.down, button:active:not(:disabled), .btn:active { transform: translateY(3px) scale(.96); filter: brightness(.92); box-shadow: 0 1px 0 #00000066 !important; transition-duration: .04s; }
+.mob-emo button.down i, .mob-emo button:active i { display: inline-block; transform: scale(1.35) rotate(-8deg); }
 .mob-emo button i { transition: transform .18s cubic-bezier(.34,1.8,.5,1); }
-.qz-btns button:active:not(:disabled) { transform: translateY(6px) scale(.94); }
+.qz-btns button.down:not(:disabled), .qz-btns button:active:not(:disabled) { transform: translateY(6px) scale(.94); }
 button:disabled { opacity: .45; filter: grayscale(.6); cursor: default; }
 .btn.pressed, button.pressed { animation: pressPop .32s cubic-bezier(.34,1.6,.5,1); }
 @keyframes pressPop { 0% { transform: scale(.92); } 60% { transform: scale(1.06); } 100% { transform: none; } }
@@ -554,5 +554,15 @@ async function adminWipe(me) {
 if (typeof document !== "undefined") document.addEventListener("click", (e) => {
   const b = e.target.closest?.("button, .btn"); if (!b || b.disabled) return;
   b.classList.remove("pressed"); void b.offsetWidth; b.classList.add("pressed");
-  try { navigator.vibrate?.(8); } catch {}
 }, true);
+
+// 누르는 동안 눌린 모양(.down) 유지 → 손을 떼면 그때 동작(click). 손가락이 버튼 밖으로 나가면 취소.
+if (typeof document !== "undefined") {
+  document.addEventListener("touchstart", () => {}, { passive: true }); // iOS :active 활성화
+  let held = null;
+  const up = () => { if (held) { const b = held; held = null; setTimeout(() => b.classList.remove("down"), 70); } };
+  document.addEventListener("pointerdown", (e) => { const b = e.target.closest?.("button, .btn"); if (!b || b.disabled) return; held = b; b.classList.add("down"); try { navigator.vibrate?.(6); } catch {} }, true);
+  document.addEventListener("pointerup", up, true);
+  document.addEventListener("pointercancel", up, true);
+  document.addEventListener("pointermove", (e) => { if (!held) return; const r = held.getBoundingClientRect(); if (e.clientX < r.left - 8 || e.clientX > r.right + 8 || e.clientY < r.top - 8 || e.clientY > r.bottom + 8) { held.classList.remove("down"); held = null; } }, true);
+}
