@@ -183,6 +183,17 @@ const CSS = `
 .mob-head .who b { font-size: 17px; display: block; } .mob-head .who b.M { color: #a8d4ff; } .mob-head .who b.F { color: #ffc2dc; }
 .mob-head .who small { font-size: 11px; color: #9a90b0; }
 .mob-head .btn { padding: 8px 12px; font-size: 13px; }
+/* 버튼 프레스 인터랙션 (채팅·메뉴·컨트롤러 공통) */
+button, .btn, [data-act], [data-emo] { -webkit-tap-highlight-color: transparent; touch-action: manipulation; user-select: none; -webkit-user-select: none; transition: transform .12s cubic-bezier(.22,1,.36,1), box-shadow .12s, filter .15s, background-color .15s; }
+@media (hover: hover) { button:hover:not(:disabled), .btn:hover { filter: brightness(1.12); } }
+button:active:not(:disabled), .btn:active { transform: translateY(3px) scale(.96); filter: brightness(.92); box-shadow: 0 1px 0 #00000066 !important; transition-duration: .04s; }
+.mob-emo button:active i { display: inline-block; transform: scale(1.35) rotate(-8deg); }
+.mob-emo button i { transition: transform .18s cubic-bezier(.34,1.8,.5,1); }
+.qz-btns button:active:not(:disabled) { transform: translateY(6px) scale(.94); }
+button:disabled { opacity: .45; filter: grayscale(.6); cursor: default; }
+.btn.pressed, button.pressed { animation: pressPop .32s cubic-bezier(.34,1.6,.5,1); }
+@keyframes pressPop { 0% { transform: scale(.92); } 60% { transform: scale(1.06); } 100% { transform: none; } }
+
 .mob-quiz { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 20px 16px; text-align: center; background: #e8d6b0; color: #3a2a1a; }
 .mob-quiz[hidden] { display: none; }
 .mob.quizzing .mob-chat, .mob.quizzing .mob-in { display: none; }
@@ -538,3 +549,10 @@ async function adminWipe(me) {
   try { await resetAll(key, me); adminKey.set(key); }
   catch (e) { alert(e.message === "forbidden" ? "관리자 코드가 맞지 않아요." : "초기화에 실패했어요."); }
 }
+
+// 손을 뗄 때 톡 튀어오르는 반동 + 짧은 진동
+if (typeof document !== "undefined") document.addEventListener("click", (e) => {
+  const b = e.target.closest?.("button, .btn"); if (!b || b.disabled) return;
+  b.classList.remove("pressed"); void b.offsetWidth; b.classList.add("pressed");
+  try { navigator.vibrate?.(8); } catch {}
+}, true);
