@@ -13,6 +13,7 @@ import * as beer from "./beer.js";
 import * as transform from "./transform.js";
 import { drawSpecial, floatOf } from "./special.js";
 import { createCurtain } from "./curtain.js";
+import { QR } from "./qrdata.js";
 import { buildOfficeBg, officeLayout } from "./office.js";
 import { buildQuizBg, drawDoll, WALL, O_ZONE, X_ZONE, setQuizW } from "./quiz.js";
 import { sfx, setSound, soundOn, savedPref, setTrack } from "./audio.js";
@@ -1561,3 +1562,12 @@ if (params.get("arrive")) setTimeout(() => randomArrivals(+params.get("arrive"),
 // 테스트용(서버에 아무것도 보내지 않음): ?debug 로 열면 콘솔에서 광장 캐릭터를 직접 움직일 수 있다
 if (params.has("debug")) window.__plaza = { get people() { return people; }, styleOf, ride, explode: () => explodeTree(), leaveAll: () => { for (const id of [...present.keys()]) leave(id); }, show: (sh) => applyShow(sh), quiz: (q, v) => applyQuiz(q, v), vote: onVote, get qs() { return quizSt; }, ceremony: (on) => setCeremony(on), office: () => toggleOffice(), arrive: (id, m) => arrive(id, m || "") };
 (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(tick));
+
+// 입장 QR: 이미지 대신 캔버스에 직접 그린다(TV·크롬캐스트 브라우저 호환)
+(function drawQR() {
+  const c = document.getElementById("qrc"); if (!c) return;
+  const n = QR.length, q = 2, k = Math.floor(256 / (n + q * 2));
+  c.width = c.height = k * (n + q * 2);
+  const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.fillStyle = "#000";
+  QR.forEach((row, y) => { for (let x = 0; x < n; x++) if (row[x] === "1") g.fillRect((x + q) * k, (y + q) * k, k, k); });
+})();
