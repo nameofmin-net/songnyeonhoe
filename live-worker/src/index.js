@@ -235,9 +235,12 @@ export class Room extends DurableObject {
     }
     if (path === "/api/reset") {
       if (!this.admin(req)) return json(req, { error: "forbidden" }, 403);
-      this.ctx.storage.sql.exec("DELETE FROM att");
+      const keep = Number.isInteger(body?.keep) ? body.keep : -1;
+      this.ctx.storage.sql.exec("DELETE FROM att WHERE id != ?", keep);
       this.ctx.storage.sql.exec("DELETE FROM chat");
-      this.broadcast({ type: "state", attendees: [] });
+      this.broadcast({ type: "reset" });
+      const left = this.ctx.storage.sql.exec("SELECT id, message, at, style FROM att").toArray().map(row);
+      this.broadcast({ type: "state", attendees: left });
       this.broadcast({ type: "chatlog", items: [] });
       return json(req, { ok: true });
     }

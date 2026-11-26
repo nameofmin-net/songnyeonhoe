@@ -1428,6 +1428,7 @@ connectLive({
   update: (e) => arrive(e.id, e.message),
   cheers: cheersAll,
   chatlog: (items) => { chatItems = items.slice(-150); renderChat(); },
+  reset: () => { if (tree.boom < 0) explodeTree(); },
   chat: onChat,
   emote: onEmote,
   show: applyShow,

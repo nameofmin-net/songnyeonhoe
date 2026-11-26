@@ -38,7 +38,7 @@ export const EMOTES = [
   ["dance", "💃", "댄스"], ["laugh", "😂", "웃음"], ["wow", "❗", "놀람"], ["sleepy", "😴", "졸려"],
 ];
 export const emoteOf = (k) => EMOTES.find((e) => e[0] === k);
-export const resetAll = (key) => post("/api/reset", {}, { "X-Admin-Key": key });
+export const resetAll = (key, keep) => post("/api/reset", keep === undefined ? {} : { keep }, { "X-Admin-Key": key });
 // 어드민(컨트롤러)
 export const ADMIN_NAME = "최민우";
 export const ADMIN_ID = ALL.findIndex((d) => d.name === ADMIN_NAME);
@@ -63,6 +63,7 @@ export function connectLive(h) {
       else if (m.type === "join") { setOverride(m.id, m.style); h.join?.(m); }
       else if (m.type === "update") { setOverride(m.id, m.style); h.update?.(m); }
       else if (m.type === "cheers") h.cheers?.();
+      else if (m.type === "reset") h.reset?.();
       else if (m.type === "chatlog") h.chatlog?.(m.items || []);
       else if (m.type === "chat") h.chat?.(m);
       else if (m.type === "emote") h.emote?.(m);
@@ -194,6 +195,8 @@ const CSS = `
 .qz-btns button:disabled { opacity: .35; } .qz-btns button.ans { opacity: 1; outline: 5px solid #5ae08a; }
 .qz-st { font-size: 15px; min-height: 1.4em; } .qz-st .ok { color: #1a8a3a; font-size: 20px; } .qz-st .ng { color: #c81e2a; font-size: 20px; }
 .qz-end { font-size: 22px; line-height: 1.6; } .qz-end small { font-size: 14px; color: #6a5a4a; }
+.mob-admin { display: flex; gap: 6px; padding: 6px 10px; border-bottom: 1px solid #ffffff14; }
+.mob-admin .btn { flex: 1; padding: 8px 6px; font-size: 13px; }
 .mob-head .btn.ctl-btn { padding: 6px 10px; font-size: 20px; }
 .mob-chat { flex: 1; overflow-y: auto; padding: 8px 10px; list-style: none; margin: 0; }
 .mob-chat .empty { color: #7a7090; text-align: center; padding: 40px 10px; font-size: 13px; line-height: 1.6; }
@@ -351,6 +354,7 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
             ${id === ADMIN_ID && onController ? `<button class="btn ctl-btn" data-act="ctl">🎮</button>` : ""}
             <button class="btn sub" data-act="edit">캐릭터 수정</button>
           </header>
+          ${id === ADMIN_ID ? `<div class="mob-admin"><button class="btn sub" data-act="rand">🎲 랜덤 5명 입장</button><button class="btn sub" data-act="wipe">💥 광장 초기화</button></div>` : ""}
           <div class="mob-quiz" hidden></div>
           <ul class="mob-chat"></ul>
           <div class="mob-emo">${EMOTES.map(([k, e, l]) => `<button type="button" data-emo="${k}"><i>${e}</i>${l}</button>`).join("")}</div>
@@ -409,6 +413,8 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
       root.querySelector(".mob").addEventListener("click", (e) => {
         const act = e.target.closest("[data-act]")?.dataset.act;
         if (act === "ctl") { onController(); return; }
+        if (act === "rand") { adminRandom(entries); return; }
+        if (act === "wipe") { adminWipe(id); return; }
         if (act === "edit") { sheet.hidden = false; sheet.scrollTop = 0; }
         if (act === "close") { sheet.hidden = true; root.querySelector(".mob-av").src = avatarURL(id, 2); }
       });
@@ -513,4 +519,22 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
     emote: (m) => { chatItems.push(m); if (chatItems.length > 150) chatItems.shift(); renderChat?.(); },
     quiz: (q, votes) => { quizState = q && q.on ? q : null; if (q && me !== null && votes && votes[me]) myPick[q.idx] = votes[me]; renderQuiz?.(); },
   };
+}
+
+const RAND_MSG = ["올해 정말 고생 많으셨어요!", "내년에도 잘 부탁드립니다 🙏", "다들 건강하세요!", "올해 최고의 팀이었어요 👏", "새해 복 많이 받으세요", "맛있는 거 먹으러 왔어요 🍗", "내년엔 더 재밌게!", "올 한 해 감사했습니다", "회식 2차 갑니다 🍻", "다들 사랑합니다 ❤️"];
+function adminRandom(entries, n = 5) {
+  const here = entries?.() || new Map(), has = (i) => (here.has ? here.has(i) : here[i]);
+  const waiting = ALL.map((d) => d.id).filter((i) => !has(i));
+  if (!waiting.length) { alert("모두 입장했어요."); return; }
+  for (let i = 0; i < n && waiting.length; i++) {
+    const pick = waiting.splice(Math.floor(Math.random() * waiting.length), 1)[0];
+    setTimeout(() => sendJoin(pick, RAND_MSG[Math.floor(Math.random() * RAND_MSG.length)]).catch(() => {}), i * 600);
+  }
+}
+async function adminWipe(me) {
+  if (!confirm("💥 광장을 초기화할까요?\n모든 기기의 입장 명단과 채팅이 지워져요. (관리자 본인은 남아요)")) return;
+  let key = adminKey.get();
+  if (!key) { key = (prompt("관리자 코드를 입력하세요.") || "").trim(); if (!key) return; }
+  try { await resetAll(key, me); adminKey.set(key); }
+  catch (e) { alert(e.message === "forbidden" ? "관리자 코드가 맞지 않아요." : "초기화에 실패했어요."); }
 }
