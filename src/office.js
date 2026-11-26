@@ -20,7 +20,18 @@ function text(p, s, x, y, c, k = 1) {
   }
 }
 
-export function buildOfficeBg(W, H, CX, FY, FLOOR_TOP, lamps) {
+// 사옥 평면 배치(스케치 기준 비율)
+export function officeLayout(W, H) {
+  const L = { tx0: Math.round(W * 0.26), tx1: Math.round(W * 0.46), ty0: Math.round(H * 0.21), ty1: Math.round(H * 0.56) };
+  L.sx0 = L.tx0 + 10; L.sx1 = L.tx1 - 4; L.sy0 = L.ty0 + 8; L.sy1 = L.ty0 + Math.round((L.ty1 - L.ty0) * 0.82);
+  const K = { x1: Math.round(W * 0.45), y0: Math.round(H * 0.69), bx0: Math.round(W * 0.06), bx1: Math.round(W * 0.33), by0: Math.round(H * 0.82) };
+  const tree = { x: Math.round(W * 0.82), y: Math.round(H * 0.57) };
+  // 못 들어가는 곳: 소파 두 조각, 라운지 테이블, 탕비실 전체
+  const blocks = [[L.sx0, L.sy0 - 2, L.sx1, L.sy0 + 12], [L.sx1 - 12, L.sy0, L.sx1, L.sy1], [L.tx0 + 20, L.ty0 + 52, L.tx0 + 40, L.ty0 + 66], [0, K.y0 - 4, K.x1 + 2, H]];
+  return { L, K, tree, blocks };
+}
+export function buildOfficeBg(W, H, CX, FY, FLOOR_TOP) {
+  const { L, K } = officeLayout(W, H);
   const f = createFrame(W, H), p = painterFor(f);
   const BLUE = C("#1e4fd6"), BLUE2 = C("#1a43b8"), INK = C("#1c1c22");
   // 벽: 흰 벽 + 천장 라인 조명
@@ -66,13 +77,29 @@ export function buildOfficeBg(W, H, CX, FY, FLOOR_TOP, lamps) {
     let c = n < 0.25 ? "#d2d1cc" : n < 0.7 ? "#d9d8d3" : "#dfded9";
     if (m < 0.04) c = "#c6c4be"; else if (m > 0.985) c = "#ecebe7";
     if ((y - FLOOR_TOP) % 60 === 59 || x % 80 === 0) c = "#cbc9c3"; // 줄눈
-    const dx = Math.abs(x - CX), dy = Math.abs(y - FY - 8);
-    const rr = (dx / 88) ** 4 + (dy / 34) ** 4;
-    if (rr < 1) c = rr > 0.8 ? "#1a43b8" : h2(x, y) < 0.08 ? "#2a5ae0" : "#1e4fd6";
+    // 파란 타일 라운지(ㄱ자 소파 자리)
+    if (x >= L.tx0 && x < L.tx1 && y >= L.ty0 && y < L.ty1) c = ((x >> 3) + (y >> 3)) % 2 ? "#1e4fd6" : "#2456dc";
+    if ((x === L.tx0 || x === L.tx1 - 1 || y === L.ty0 || y === L.ty1 - 1) && x >= L.tx0 && x < L.tx1 && y >= L.ty0 && y < L.ty1) c = "#1a3fa8";
     f.color[y * W + x] = C(c);
   }
-  for (const [x, y] of lamps) p.glow(x, y - 30, 40, C("#fff6e0"), 0.15);
-  p.glow(CX, FY - 40, 140, C("#ffffff"), 0.06);
+  // ㄱ자 소파(그레이 + 오렌지·레드 쿠션)
+  const sofa = (x, y, w, h) => { p.rect(x, y, w, h, C("#8e8e94")); p.rect(x + 1, y + 1, w - 2, h - 3, C("#a8a8ae")); p.rect(x + 1, y + 1, w - 2, 1, C("#c4c4ca")); p.rect(x, y + h - 1, w, 1, C("#6a6a70")); };
+  sofa(L.sx0, L.sy0, L.sx1 - L.sx0, 12);
+  sofa(L.sx1 - 12, L.sy0, 12, L.sy1 - L.sy0);
+  p.rect(L.sx0 + 8, L.sy0 + 3, 9, 6, C("#e0642a")); p.rect(L.sx0 + 22, L.sy0 + 3, 9, 6, C("#c8332f"));
+  p.rect(L.sx1 - 10, L.sy0 + 30, 8, 9, C("#e0642a"));
+  // 라운지 원형 테이블 + 블루 큐브
+  p.circle(L.tx0 + 30, L.ty0 + 60, 9, C("#2a2a30")); p.circle(L.tx0 + 30, L.ty0 + 59, 8, C("#f4f4f2"));
+  p.rect(L.tx0 + 10, L.ty1 - 26, 12, 11, C("#3a6ae8")); p.rect(L.tx0 + 10, L.ty1 - 16, 12, 1, C("#1a3fa8"));
+  // 탕비실: 위쪽 벽+카운터, 오른쪽 파티션, 긴 원목 바 테이블 + 검은 스툴
+  p.rect(0, K.y0, K.x1, 5, C("#2a2a30")); p.rect(0, K.y0 + 5, K.x1 - 20, 9, C("#f4f4f2")); p.rect(0, K.y0 + 13, K.x1 - 20, 1, C("#c8c8c4"));
+  for (let x = 8; x < K.x1 - 30; x += 22) p.rect(x, K.y0 + 6, 8, 5, C(x % 44 ? "#1c1c22" : "#c8c8cc")); // 커피머신·전자레인지
+  p.rect(K.x1 - 4, K.y0, 5, H - K.y0, C("#2a2a30")); p.rect(K.x1 - 3, K.y0, 1, H - K.y0, C("#5a5a62"));
+  p.rect(K.bx0, K.by0, K.bx1 - K.bx0, 10, C("#d8a860")); p.rect(K.bx0, K.by0, K.bx1 - K.bx0, 2, C("#f0c880")); p.rect(K.bx0, K.by0 + 9, K.bx1 - K.bx0, 1, C("#8a6440"));
+  for (let i = 0; i < 4; i++) { const sx = K.bx0 + 10 + i * Math.round((K.bx1 - K.bx0 - 20) / 3.2); for (const sy of [K.by0 - 9, K.by0 + 14]) { p.circle(sx, sy, 3.5, C("#1c1c22")); p.rect(sx - 1, sy - 2, 2, 1, C("#4a4a52")); } }
+  // 펜던트 조명 빛
+  p.glow((L.tx0 + L.tx1) / 2, (L.ty0 + L.ty1) / 2, 70, C("#ffffff"), 0.12);
+  p.glow((K.bx0 + K.bx1) / 2, K.by0, 60, C("#fff2d8"), 0.18);
   const bg = new Uint32Array(W * H), light = new Uint32Array(W * H);
   for (let i = 0; i < W * H; i++) { bg[i] = f.color[i]; light[i] = f.light[i]; }
   return { bg, light };

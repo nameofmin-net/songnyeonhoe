@@ -13,7 +13,7 @@ import * as beer from "./beer.js";
 import * as transform from "./transform.js";
 import { drawSpecial, floatOf } from "./special.js";
 import { createCurtain } from "./curtain.js";
-import { buildOfficeBg, officeLamp, officeSofa, officePlant, officeTable } from "./office.js";
+import { buildOfficeBg, officeLayout } from "./office.js";
 import { buildQuizBg, drawDoll, WALL, O_ZONE, X_ZONE, setQuizW } from "./quiz.js";
 import { sfx, setSound, soundOn, savedPref, setTrack } from "./audio.js";
 import { ALL, MAX, sortedByName, avatarURL, mountEntry, connectLive, sendJoin, sendCheers, resetAll, styleOf, chatItemHTML } from "./joinform.js";
@@ -182,9 +182,12 @@ function buildProps() {
 function blocked(x, y) {
   if (typeof quizSt !== "undefined" && quizSt.q) return x < 12 || x > W - 12 || y < WALL + 16 || y > H - 6;
   if (x < 12 || x > W - 12 || y < FLOOR_TOP + 10 || y > H - 6) return true;
-  if (!officeOn && (x + (H - y) * 1.1 < 96 || W - x + (H - y) * 1.1 < 96)) return true; // 화단
+  if (officeOn) {
+    for (const b of OFFICE.blocks) if (x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]) return true;
+    const t = OFFICE.tree; return (((x - t.x) / 62) ** 2 + ((y - t.y + 8) / 16) ** 2 < 1);
+  }
+  if (x + (H - y) * 1.1 < 96 || W - x + (H - y) * 1.1 < 96) return true; // 화단
   for (const b of blocks) {
-    if (b.podium && officeOn && !ceremony?.on) continue;
     if (b.tree && ceremony?.on) continue;
     if (b.ell) { const [cx, cy, rx, ry] = b.ell; if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 < 1) return true; }
     else if (x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]) return true;
@@ -743,19 +746,18 @@ function tick(nowMs) {
     p.glow(tx, ty, 10, C("#ff4040"), 0.8 * a);
     if (L.t > 0.3) quizSt.laser = null;
   }
-  const items = [...people.map((r) => ({ y: r.onStage ? 104.5 : r.y, r })), ...(Q ? [] : props.map((p) => ({ y: p.y, p })))];
+  const items = [...people.map((r) => ({ y: r.onStage ? 104.5 : r.y, r })), ...(Q ? [] : (officeOn ? officeProps : props).map((p) => ({ y: p.y, p })))];
   items.sort((a, b) => a.y - b.y);
   for (const it of items) {
     if (it.r) it.r.draw();
     else if (it.p) {
-      if (officeOn && it.p.spr === podium && !ceremony?.on) continue;
       if (it.p.spr === bigTree) {
         const from = treeFromRow();
         if (from >= bigTree.h) continue;
         const sx = tree.shake > 0 ? Math.round(Math.sin(tree.shake * 60)) : 0, pp = sx ? { ...it.p, x: it.p.x + sx } : it.p;
         if (from > 0) blitProp(pp, from);
         else { blitProp(pp); drawTreeLights(painterFor(frame), pp.x, pp.y, now); }
-      } else blitProp(officeOn ? { ...it.p, spr: OFFICE_SWAP.get(it.p.spr) || it.p.spr } : it.p);
+      } else blitProp(it.p);
     }
   }
   for (const it of items) if (it.r) it.r.drawFront();
@@ -775,7 +777,7 @@ const savedKey = () => { try { return localStorage.getItem(ADMIN_KEY_LS) || ""; 
 const saveKey = (k) => { try { k ? localStorage.setItem(ADMIN_KEY_LS, k) : localStorage.removeItem(ADMIN_KEY_LS); } catch {} };
 const TAPS_NEEDED = 10, TAP_WINDOW = 5000;
 const tree = { taps: [], shake: 0, boom: -1, bits: [], sparks: [], dust: [] };
-const treeProp = () => props.find((p) => p.spr === bigTree);
+const treeProp = () => (officeOn ? officeProps : props).find((p) => p.spr === bigTree);
 function hitTree(x, y) {
   const p = treeProp(); if (!p || tree.gone) return false;
   const s = p.spr, lx = Math.floor(x - (p.x - s.ox)), ly = Math.floor(y - (p.y - s.oy));
@@ -896,13 +898,16 @@ const treeFromRow = () => (tree.gone ? bigTree.h : tree.boom < 0 ? 0 : Math.ceil
 
 // ---------- 이스터에그: 단상 뒤 출입문 더블클릭 → 유플리트 사옥 ⇄ 광장 ----------
 officeScene = null;
-const OFFICE_SWAP = new Map([[lampSpr, officeLamp], [benchSpr, officeSofa], [treeSpr, officePlant], [potSpr, officeTable]]);
+const OFFICE = officeLayout(W, H);
+const officeProps = [{ spr: bigTree, x: OFFICE.tree.x, y: OFFICE.tree.y }];
 function toggleOffice() {
-  if (!officeScene) officeScene = buildOfficeBg(W, H, CX, FY, FLOOR_TOP, props.filter((p) => p.spr === lampSpr).map((p) => [p.x, p.y]));
+  if (!officeScene) officeScene = buildOfficeBg(W, H, CX, FY, FLOOR_TOP);
   sfx.enter?.();
   cv.animate([{ filter: "brightness(1)" }, { filter: "brightness(0)", offset: 0.45 }, { filter: "brightness(0)", offset: 0.55 }, { filter: "brightness(1)" }], { duration: 700, easing: "ease-in-out" });
   setTimeout(() => {
     officeOn = !officeOn;
+    // 벽·소파 안에 갇힌 사람은 빈 자리로
+    for (const r of people) { if (r.seat) continue; let k = 0; while (blocked(r.x, r.y) && k++ < 200) { r.x = rnd(20, W - 20); r.y = rnd(FLOOR_TOP + 14, H - 10); } }
     $("#presT").textContent = officeOn ? "출근한 사람" : "송년회 참석 중";
     $("#waitT").textContent = officeOn ? "아직 출근 전" : "아직 도착 전";
   }, 340);
@@ -1403,6 +1408,7 @@ function seatEveryone() {
 }
 function seatEveryoneOne(r) { r.seat = { x: CX - 26, y: 98, jump: true, jx: CX - 26, jy: 116, stand: true, face: 0 }; }
 function setCeremony(on) {
+  if (on && officeOn) { officeOn = false; $("#presT").textContent = "송년회 참석 중"; $("#waitT").textContent = "아직 도착 전"; }
   if (on === ceremony.on) return;
   ceremony.on = on;
   if (on) {
