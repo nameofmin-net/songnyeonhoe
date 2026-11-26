@@ -1304,7 +1304,7 @@ async function doUpl(sh, isNew) {
   if (sh.step === 2 && prev !== 3) startSpotlight(sh);
   if (sh.step === 3) { if (!showCard.querySelector(".up-2.done")) revealWinner(sh); sfx.fanfare(); sfx.applause(3); confettiRain(); }
 }
-function applyShow(sh) { if (sh && officeOn) toggleOffice(); setTrack(sh ? "award" : quizOn() ? "quiz" : "carol"); showChain = showChain.then(() => doShow(sh)).catch(() => {}); }
+function applyShow(sh) { if (sh && officeOn) { officeOn = false; setTv(false); for (const r of people) if (r.seat?.office || r.seat?.leave) r.seat = null; $("#presT").textContent = "송년회 참석 중"; $("#waitT").textContent = "아직 도착 전"; } setTrack(sh ? "award" : quizOn() ? "quiz" : "carol"); showChain = showChain.then(() => doShow(sh)).catch(() => {}); }
 
 // ---------- 기본 메뉴: OX 퀴즈 ----------
 var quizSt = { q: null, votes: {}, dollFront: false };
@@ -1468,7 +1468,7 @@ function seatEveryone() {
 }
 function seatEveryoneOne(r) { r.seat = { x: CX - 26, y: 98, jump: true, jx: CX - 26, jy: 116, stand: true, face: 0 }; }
 function setCeremony(on) {
-  if (on && officeOn) { officeOn = false; for (const r of people) if (r.seat?.office || r.seat?.leave) r.seat = null; $("#presT").textContent = "송년회 참석 중"; $("#waitT").textContent = "아직 도착 전"; }
+  if (on && officeOn) { officeOn = false; setTv(false); setTrack("carol"); for (const r of people) if (r.seat?.office || r.seat?.leave) r.seat = null; $("#presT").textContent = "송년회 참석 중"; $("#waitT").textContent = "아직 도착 전"; }
   if (on === ceremony.on) return;
   ceremony.on = on;
   if (on) {
