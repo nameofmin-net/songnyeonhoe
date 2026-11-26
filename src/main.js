@@ -41,6 +41,10 @@ function resize() {
   for (const c of [cv, ov]) { c.style.width = cw + "px"; c.style.height = ch + "px"; }
   stage.style.width = cw + "px"; stage.style.height = ch + "px";
   document.getElementById("row").style.height = wide ? ch + "px" : "";
+  // 화면이 16:9보다 넓으면 남는 가로폭을 양옆 패널이 나눠 가져 여백을 없앤다
+  const extra = wide ? Math.max(0, innerWidth - 24 - side - cw) : 0;
+  const L = document.querySelector(".col.left"), R = document.querySelector(".col.right");
+  if (L && R) { L.style.width = wide ? 236 + Math.floor(extra * 0.44) + "px" : ""; R.style.width = wide ? 300 + Math.floor(extra * 0.56) + "px" : ""; }
   dpr = devicePixelRatio || 1;
   ov.width = Math.round(cw * dpr); ov.height = Math.round(ch * dpr);
 }
