@@ -1051,7 +1051,7 @@ function uplHTML(sh) {
     <div class="up-corner br"><b>U PLEAT</b><span>Inspired by Essence</span></div>
     <div class="up-p up-0"><div class="up-big">🌿 올해의<br>유플리더스 🌿</div></div>
     <div class="up-p up-1"><div class="up-kicker">올해의 유플리더스</div><div class="up-title">${esc(sh.title)}</div>${sh.desc ? `<p class="up-desc">${esc(sh.desc)}</p>` : ""}${sh.prizeOn && sh.prize ? `<div class="up-prize">상금 : ${esc(sh.prize)}</div>` : ""}</div>
-    <div class="up-p up-2"><div class="up-kicker">올해의 유플리더스</div><div class="up-title sm">${esc(sh.title)}</div><div class="up-call"></div><div class="track"><div class="finish"></div></div>
+    <div class="up-p up-2"><div class="up-kicker">올해의 유플리더스</div><div class="up-title sm">${esc(sh.title)}</div><div class="up-call"></div><canvas class="race" width="360" height="170"></canvas>
       <div class="up-win"><div class="up-title">${esc(sh.title)} : ${w ? esc(w.name) : ""}</div><div class="up-medal"><canvas width="${SW}" height="${SH}"></canvas></div>${sh.quote ? `<p class="up-quote">“${esc(sh.quote)}”</p>` : ""}</div></div>`;
 }
 function drawSpr(cv, id, dir, step, cache) {
@@ -1060,44 +1060,113 @@ function drawSpr(cv, id, dir, step, cache) {
 }
 function startRace(sh) {
   stopRace();
-  const box = showCard.querySelector(".track"), call = showCard.querySelector(".up-call"), panel = showCard.querySelector(".up-2");
+  const cv = showCard.querySelector(".race"), g = cv.getContext("2d"), call = showCard.querySelector(".up-call"), panel = showCard.querySelector(".up-2");
   const ids = [sh.winner, ...(sh.rivals || [])].filter((id) => ALL[id]).sort(() => Math.random() - 0.5);
-  const winEl = showCard.querySelector(".up-win");
   if (ids.length < 2) { panel.classList.add("done"); revealWinner(sh); return; }
-  const lanes = ids.length;
-  box.innerHTML = `<div class="finish"></div>` + ids.map((id, i) => `<div class="rn" data-id="${id}" style="top:${(i / lanes) * 100}%;height:${100 / lanes}%"><canvas width="${SW}" height="${SH}"></canvas><b>${esc(ALL[id].name)}</b></div>`).join("");
-  const els = [...box.querySelectorAll(".rn")];
-  box.style.setProperty("--lanes", lanes);
-  const D = 8.5;
-  // 경쟁자: 들쭉날쭉 앞서거니 뒤서거니, 결승 직전 0.86~0.95에서 멈춤 / 수상자: 뒤처지다 막판 역전
-  const rv = ids.map((id) => ({ id, win: id === sh.winner, end: 0.86 + Math.random() * 0.09, a: 0.04 + Math.random() * 0.05, f: 1.2 + Math.random() * 1.6, ph: Math.random() * 6.28, cache: new Map() }));
+  g.imageSmoothingEnabled = false;
+  const VW = 360, VH = 170, L = 2400, D = 8.5, n = ids.length;
+  // 뒤 레인일수록 위·작게(원근)
+  const rv = ids.map((id, i) => ({ id, win: id === sh.winner, lane: i, end: 0.86 + Math.random() * 0.09, a: 0.04 + Math.random() * 0.05, f: 1.2 + Math.random() * 1.6, ph: Math.random() * 6.28, cache: new Map(), cv: new Map(), out: 0 }));
+  rv.forEach((r) => { const d = n === 1 ? 1 : r.lane / (n - 1); r.y = 98 + d * 58; r.k = 1.55 + d * 0.75; });
   const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   const pos = (r, t) => r.win ? 0.8 * t + 0.2 * sm(0.72, 1, t) - 0.04 * Math.sin(t * 6.28) * (1 - t)
     : Math.min(r.end, r.end * (t + r.a * Math.sin(r.f * 6.28 * t + r.ph) * (1 - t) + 0.06 * Math.sin(t * 3.14)));
   const calls = [[0, "출발! 🏁"], [0.25, "치열한 접전!"], [0.5, "선두가 계속 바뀌어요!"], [0.72, "어?! 뒤에서 누가 치고 나와요!"], [0.88, "역전!!! 🔥"], [1, "결승!"]];
-  let t0 = performance.now(), lastCall = -1, phase = "run", endAt = 0;
-  sfx.drumroll(1.0); setTimeout(() => sfx.applause(4), 600);
-  const W = box.clientWidth, runW = W * 0.86;
-  const tick = (ms) => {
-    const t = Math.min(1, (ms - t0) / 1000 / D);
-    const ci = calls.findLastIndex(([at]) => t >= at);
-    if (ci !== lastCall) { lastCall = ci; call.textContent = calls[ci][1]; call.classList.remove("pop"); void call.offsetWidth; call.classList.add("pop"); if (calls[ci][0] === 0.88) { sfx.drumroll(0.6); } }
-    // 선두 표시
-    const ps = rv.map((r) => pos(r, t)), lead = ps.indexOf(Math.max(...ps));
-    rv.forEach((r, i) => {
-      const el = els[i];
-      el.style.transform = `translateX(${(ps[i] * runW).toFixed(1)}px)`;
-      el.classList.toggle("lead", i === lead && t > 0.05);
-      const step = phase === "run" && t < 1 ? Math.floor(ms / 90) % 4 : 0;
-      const key = (phase === "run" && t < 1 ? 2 : 0) * 10 + step;
-      if (r.key !== key) { r.key = key; drawSpr(el.querySelector("canvas"), r.id, phase === "run" && t < 1 ? 2 : 0, step, r.cache); }
-    });
-    if (t >= 1 && phase === "run") {
-      phase = "out"; endAt = ms; sfx.fanfare();
-      // 최후 1인만 남기고 하나씩 사라진다
-      rv.forEach((r, i) => { if (!r.win) setTimeout(() => { els[i].classList.add("out"); sfx.pop(); }, 500 + i * 220); });
-      setTimeout(() => { panel.classList.add("done"); revealWinner(sh); }, 900 + lanes * 220);
+  const frameCv = (r, dir, step) => {
+    const k = dir * 10 + step; if (r.cv.has(k)) return r.cv.get(k);
+    const c = document.createElement("canvas"); c.width = SW; c.height = SH; c.getContext("2d").putImageData(spriteImage(styleOf(r.id), dir, step, r.cache), 0, 0); r.cv.set(k, c); return c;
+  };
+  const crowd = Array.from({ length: 140 }, (_, i) => ({ x: i * 9 + Math.random() * 6, y: 30 + Math.random() * 26, c: choose(["#ffd84a", "#ff8ad8", "#8ae8ff", "#ffffff", "#ff5a5a", "#5ae08a"]) }));
+  const dust = [], streaks = Array.from({ length: 26 }, () => ({ x: Math.random() * VW, y: 70 + Math.random() * 100, l: 20 + Math.random() * 50, v: 1.5 + Math.random() }));
+  let t0 = performance.now(), last = t0, lastCall = -1, phase = "run", cam = 0, camV = 0, shake = 0, cut = -1, paused = 0;
+  const winR = rv.find((r) => r.win);
+  // 역전 컷인(데이브 더 다이브식 과장 연출): 화면이 멈추고 사선 띠 위로 수상자 클로즈업 + 집중선
+  const drawCut = (u, ms) => {
+    const sl = Math.min(1, u / 0.15), out = u > 0.85 ? (u - 0.85) / 0.15 : 0;
+    g.fillStyle = `rgba(0,0,30,${0.55 * sl * (1 - out)})`; g.fillRect(0, 0, VW, VH);
+    g.save(); g.translate(VW / 2, VH / 2); g.rotate(-0.18);
+    const bw = VW * 1.4 * sl, bh = 86 * (1 - out);
+    g.fillStyle = "#ffd84a"; g.fillRect(-bw / 2, -bh / 2 - 4, bw, bh + 8);
+    g.fillStyle = "#c81e2a"; g.fillRect(-bw / 2, -bh / 2, bw, bh);
+    // 집중선
+    g.fillStyle = "#ffffff55";
+    for (let i = 0; i < 40; i++) { const an = (i / 40) * Math.PI * 2 + ms / 400, r0 = 30 + Math.random() * 20; g.save(); g.rotate(an); g.fillRect(r0, -0.6, 160, 1.2); g.restore(); }
+    g.restore();
+    if (sl >= 1 && out < 1) {
+      const k = 4.2 + Math.sin(u * 30) * 0.08, w = SW * k, h = SH * k, img = frameCv(winR, 0, 0);
+      const ox = VW * 0.33 + (1 - Math.min(1, (u - 0.15) / 0.12)) * -140;
+      g.globalAlpha = 1 - out;
+      g.drawImage(img, 0, 0, SW, 17, Math.round(ox - w / 2), Math.round(VH / 2 - 17 * k / 2), Math.round(w), Math.round(17 * k));
+      // 번뜩이는 눈
+      if (Math.floor(ms / 90) % 2) { g.fillStyle = "#fff"; g.fillRect(Math.round(ox - w / 2 + 6 * k), Math.round(VH / 2 - 17 * k / 2 + 9 * k), Math.round(k), Math.round(k)); g.fillRect(Math.round(ox - w / 2 + 11 * k), Math.round(VH / 2 - 17 * k / 2 + 9 * k), Math.round(k), Math.round(k)); }
+      g.save(); g.translate(VW * 0.68, VH / 2); g.rotate(-0.18); const ts = 1 + Math.max(0, 0.6 - (u - 0.2) * 4);
+      g.scale(ts, ts); g.font = "bold 30px Galmuri11, sans-serif"; g.textAlign = "center"; g.lineWidth = 6; g.strokeStyle = "#1c1624"; g.strokeText("역전!!", 0, 6); g.fillStyle = "#fff3c0"; g.fillText("역전!!", 0, 6);
+      g.font = "12px Galmuri11, sans-serif"; g.lineWidth = 4; g.strokeText(ALL[winR.id].name, 0, 28); g.fillStyle = "#fff"; g.fillText(ALL[winR.id].name, 0, 28); g.restore();
+      g.globalAlpha = 1;
     }
+  };
+  sfx.drumroll(1.0); setTimeout(() => sfx.applause(4), 600);
+  const tick = (ms) => {
+    const dt = Math.min(0.05, (ms - last) / 1000); last = ms;
+    if (cut >= 0) { cut += dt; t0 += dt * 1000; if (cut > 1.6) { cut = -2; shake = 0.4; } }
+    const t = Math.min(1, (ms - t0) / 1000 / D);
+    if (cut === -1 && t >= 0.86) { cut = 0; sfx.drumroll(0.5); setTimeout(() => sfx.fanfare(), 350); }
+    const ci = calls.findLastIndex(([at]) => t >= at);
+    if (ci !== lastCall) { lastCall = ci; call.textContent = calls[ci][1]; call.classList.remove("pop"); void call.offsetWidth; call.classList.add("pop"); if (calls[ci][0] === 0.88) { sfx.drumroll(0.6); shake = 0.5; } }
+    rv.forEach((r) => (r.x = pos(r, t) * L));
+    const lead = rv.reduce((a, b) => (b.x > a.x ? b : a));
+    // 카메라: 선두를 화면 오른쪽 2/3에 두고 따라감(관성)
+    const prevCam = cam, target = lead.x - VW * 0.62;
+    cam += (target - cam) * Math.min(1, dt * 4); camV = (cam - prevCam) / Math.max(dt, 0.001);
+    const spd = Math.min(1, Math.abs(camV) / 300);
+    if (shake > 0) shake -= dt;
+    const sx = shake > 0 ? (Math.random() - 0.5) * 4 : 0;
+    g.save(); g.translate(sx, 0);
+    // 하늘·관중석(느린 패럴랙스)
+    const sky = g.createLinearGradient(0, 0, 0, 70); sky.addColorStop(0, "#0c1c8c"); sky.addColorStop(1, "#2a4ae0"); g.fillStyle = sky; g.fillRect(-4, 0, VW + 8, 70);
+    g.fillStyle = "#15206a"; g.fillRect(-4, 26, VW + 8, 40);
+    for (const p of crowd) { const x = ((p.x - cam * 0.25) % 1260 + 1260) % 1260 - 10; if (x < VW + 4) { g.fillStyle = p.c; g.fillRect(Math.round(x), Math.round(p.y + (Math.sin(ms / 120 + p.x) > 0.6 ? -1 : 0)), 3, 3); } }
+    g.fillStyle = "#e9b955"; g.fillRect(-4, 64, VW + 8, 3);
+    // 트랙
+    g.fillStyle = "#b8442f"; g.fillRect(-4, 67, VW + 8, VH - 67);
+    for (let i = 0; i <= n; i++) { const y = Math.round(84 + (i / n) * 76); g.fillStyle = "#f4e6d0aa"; g.fillRect(-4, y, VW + 8, 1); }
+    // 거리 표시(빠르게 지나감)
+    for (let m = Math.floor(cam / 120) * 120; m < cam + VW + 120; m += 120) { const x = Math.round(m - cam); g.fillStyle = "#ffffff55"; g.fillRect(x, 70, 2, 98); }
+    // 결승선
+    const fx = Math.round(L - cam + 30);
+    if (fx < VW + 20) for (let y = 70; y < VH; y += 4) for (let k = 0; k < 2; k++) { g.fillStyle = ((y / 4 + k) % 2) ? "#ffffff" : "#1c1624"; g.fillRect(fx + k * 4, y, 4, 4); }
+    // 속도선
+    g.fillStyle = `rgba(255,255,255,${0.15 + 0.45 * spd})`;
+    for (const st of streaks) { st.x -= st.v * (300 + 700 * spd) * dt; if (st.x + st.l < 0) { st.x = VW + Math.random() * 60; st.y = 70 + Math.random() * 100; } g.fillRect(Math.round(st.x), Math.round(st.y), Math.round(st.l * (0.4 + spd)), 1); }
+    // 달리는 사람들(뒤 레인부터)
+    const running = phase === "run" && t < 1, step = running ? Math.floor(ms / 55) % 4 : 0;
+    for (const r of [...rv].sort((a, b) => a.y - b.y)) {
+      const x = r.x - cam, w = SW * r.k, h = SH * r.k;
+      if (x < -60 || x > VW + 60) continue;
+      if (running && Math.random() < dt * 14) dust.push({ x: r.x - 6, y: r.y - 2, t: 0 });
+      const bob = running && step % 2 ? -r.k : 0;
+      g.globalAlpha = 1 - r.out;
+      g.fillStyle = "#0004"; g.fillRect(Math.round(x - w * 0.35), Math.round(r.y - 2), Math.round(w * 0.7), 3);
+      g.drawImage(frameCv(r, running ? 2 : 0, step), Math.round(x - w / 2), Math.round(r.y - h + bob), Math.round(w), Math.round(h));
+      if (r.out > 0) { g.fillStyle = `rgba(255,255,255,${r.out})`; g.fillRect(Math.round(x - w / 2), Math.round(r.y - h), Math.round(w), Math.round(h)); }
+      g.font = "8px Galmuri11, sans-serif"; g.textAlign = "center";
+      const label = (r === lead && t > 0.05 ? "👑" : "") + ALL[r.id].name, tw = g.measureText(label).width + 6;
+      g.fillStyle = r === lead ? "#ffd84a" : "#0a1060cc"; g.fillRect(Math.round(x - tw / 2), Math.round(r.y - h - 11 + bob), Math.round(tw), 10);
+      g.fillStyle = r === lead ? "#1c1624" : "#fff"; g.fillText(label, Math.round(x), Math.round(r.y - h - 3 + bob));
+      g.globalAlpha = 1;
+    }
+    for (const d of dust) { d.t += dt; const x = d.x - cam - d.t * 30, a = Math.max(0, 1 - d.t / 0.5); g.fillStyle = `rgba(240,210,170,${a * 0.8})`; g.fillRect(Math.round(x), Math.round(d.y - d.t * 10), 3, 2); }
+    for (let i = dust.length - 1; i >= 0; i--) if (dust[i].t > 0.5) dust.splice(i, 1);
+    // 가장자리 집중선(속도감)
+    if (spd > 0.3) { g.fillStyle = `rgba(255,255,255,${(spd - 0.3) * 0.25})`; for (let i = 0; i < 10; i++) { const y = Math.random() * VH; g.fillRect(0, y, 30 + Math.random() * 40, 1); } }
+    g.restore();
+    if (cut >= 0) drawCut(cut / 1.6, ms);
+    if (t >= 1 && phase === "run") {
+      phase = "out"; sfx.fanfare();
+      rv.filter((r) => !r.win).forEach((r, i) => setTimeout(() => { r.fade = true; sfx.pop(); }, 500 + i * 220));
+      setTimeout(() => { panel.classList.add("done"); revealWinner(sh); }, 900 + n * 220);
+    }
+    for (const r of rv) if (r.fade) r.out = Math.min(1, r.out + dt * 2.2);
     if (race) race.raf = requestAnimationFrame(tick);
   };
   race = { raf: requestAnimationFrame(tick) };

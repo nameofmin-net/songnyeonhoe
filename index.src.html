@@ -93,7 +93,8 @@
   #show .rn.lead b { color: #1c1624; background: #ffd84a; }
   #show .rn.lead b::before { content: "👑 "; }
   #show .rn.out { opacity: 0; filter: brightness(3) blur(.3cqw); }
-  #show .up-2.done .track, #show .up-2.done .up-call, #show .up-2.done > .up-title.sm, #show .up-2.done > .up-kicker { display: none; }
+  #show .race { position: static; inset: auto; width: 84cqw; height: auto; aspect-ratio: 360 / 170; image-rendering: pixelated; border: .4cqw solid #e9b955; box-shadow: 0 0 0 .3cqw #0a1060; }
+  #show .up-2.done .race, #show .up-2.done .up-call, #show .up-2.done > .up-title.sm, #show .up-2.done > .up-kicker { display: none; }
   #show .up-win { display: none; flex-direction: column; align-items: center; gap: 2cqh; }
   #show .up-win.on { display: flex; animation: shIn .8s cubic-bezier(.22,1,.36,1) both; }
   #show .up-medal { width: 18cqh; height: 18cqh; border-radius: 50%; background: #0c1c8c; border: .6cqh solid #e9b955; box-shadow: 0 0 0 .4cqh #8a5a10; display: grid; place-items: center; overflow: hidden; }
