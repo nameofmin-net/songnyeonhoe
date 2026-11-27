@@ -42,6 +42,10 @@ export const resetAll = (key, keep) => post("/api/reset", keep === undefined ? {
 // 어드민(컨트롤러)
 export const ADMIN_NAME = "최민우";
 export const ADMIN_ID = ALL.findIndex((d) => d.name === ADMIN_NAME);
+// 관리자로 지정된 사람들(서버가 알려줌, 아직 지정 전이면 기본 관리자 한 명)
+let adminIds = null;
+export const isAdmin = (id) => (adminIds ? adminIds.includes(id) : id === ADMIN_ID);
+export const setAdmins = (ids) => { adminIds = Array.isArray(ids) ? ids : null; };
 const ADMIN_LS = "songnyeonhoe-admin";
 export const adminKey = { get: () => { try { return localStorage.getItem(ADMIN_LS) || ""; } catch { return ""; } }, set: (k) => { try { k ? localStorage.setItem(ADMIN_LS, k) : localStorage.removeItem(ADMIN_LS); } catch {} } };
 export const sendQuizVote = (id, pick) => post("/api/quiz/vote", { id, pick });
@@ -66,6 +70,8 @@ export function connectLive(h) {
       else if (m.type === "reset") h.reset?.();
       else if (m.type === "office") h.office?.(m.on);
       else if (m.type === "reload") h.reload?.();
+      else if (m.type === "admins") { setAdmins(m.ids); h.admins?.(m.ids); }
+      else if (m.type === "adminreq") h.adminreq?.();
       else if (m.type === "music") h.music?.(m.play);
       else if (m.type === "chatlog") h.chatlog?.(m.items || []);
       else if (m.type === "chat") h.chat?.(m);
@@ -140,6 +146,13 @@ const CSS = `
 .jf .gsx { font: inherit; font-size: 13px; padding: 6px 12px; color: #f4eefc; background: #221a36; border: 2px solid #4a3f6a; cursor: pointer; }
 .jf .gsx.on { background: #ffd84a; color: #1c1624; border-color: #fff3b0; }
 .jf .gsx.x { color: #9a90b0; }
+.agate { position: fixed; inset: 0; z-index: 100; background: #0b0812cc; display: grid; place-items: center; padding: 16px; }
+.agate-box { width: min(360px, 100%); background: #1a1426; border: 3px solid #ffd84a; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.agate-box b { font-size: 17px; color: #ffd84a; }
+.agate-box p { margin: 0; font-size: 13px; line-height: 1.6; color: #c9c0dc; }
+.agate-box input { font: inherit; font-size: 16px; color: #f4eefc; background: #15101f; border: 2px solid #4a3f6a; padding: 10px 12px; }
+.agate-box input:focus { outline: none; border-color: #ffd84a; }
+.agate-msg { font-size: 13px; color: #ffd84a; min-height: 1.2em; }
 .jf select:focus, .jf textarea:focus { outline: none; border-color: #ffd84a; }
 .jf textarea { resize: none; height: 72px; line-height: 1.5; }
 .jf .cnt { align-self: flex-end; font-size: 11px; color: #7a7090; }
@@ -360,6 +373,8 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
     f.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (btn.disabled) return;
+      // 관리자로 지정된 이름이면 비밀번호(또는 관리자 승인)를 먼저 받는다
+      if (pickId !== null && isAdmin(pickId) && !(await adminOk())) { adminGate(pickId, () => f.requestSubmit ? f.requestSubmit() : f.dispatchEvent(new Event("submit", { cancelable: true }))); return; }
       if (pickId !== null && entries().has(pickId)) { open(pickId, "already"); return; }
       btn.disabled = true; out.textContent = "보내는 중…";
       try {
@@ -369,6 +384,43 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
         onEntered?.(id);
       } catch (err) { out.textContent = err.message === "full" ? "직접 입력 자리가 다 찼어요. 관리자에게 알려 주세요." : "전송에 실패했어요. 잠시 후 다시 눌러 주세요."; check(); }
     });
+    const adminOk = async () => { if (!adminKey.get()) return false; try { await adminPost("/api/admin/check", {}); return true; } catch { adminKey.set(""); return false; } };
+    function adminGate(aid, done) {
+      const g = document.createElement("div"); g.className = "agate";
+      g.innerHTML = `<div class="agate-box"><b>🔒 관리자 이름이에요</b><p>${esc(ALL[aid].name)} 님은 관리자로 지정돼 있어요.<br>비밀번호를 넣거나, 관리자에게 권한을 요청해 주세요.</p>
+        <input type="password" placeholder="비밀번호" autocomplete="off"><div class="agate-msg"></div>
+        <button type="button" class="btn" data-g="pw">확인</button><button type="button" class="btn sub" data-g="req">🙋 권한 요청하기</button><button type="button" class="btn sub" data-g="x">취소</button></div>`;
+      f.appendChild(g);
+      const pw = g.querySelector("input"), gm = g.querySelector(".agate-msg");
+      let poll = 0;
+      const close = () => { clearInterval(poll); g.remove(); };
+      const pass = () => { close(); done(); };
+      pw.focus();
+      pw.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); g.querySelector('[data-g="pw"]').click(); } });
+      g.addEventListener("click", async (e) => {
+        const k = e.target.closest("[data-g]")?.dataset.g; if (!k) return;
+        if (k === "x") return close();
+        if (k === "pw") {
+          adminKey.set(pw.value.trim()); gm.textContent = "확인 중…";
+          if (await adminOk()) pass(); else { gm.textContent = "비밀번호가 맞지 않아요."; pw.select(); }
+        }
+        if (k === "req") {
+          gm.textContent = "요청 보내는 중…";
+          try {
+            const { rid } = await post("/api/admin/request", { id: aid });
+            gm.textContent = "관리자 승인을 기다리는 중이에요… ⏳"; e.target.disabled = true;
+            clearInterval(poll);
+            poll = setInterval(async () => {
+              try {
+                const r = await post("/api/admin/status", { rid });
+                if (r.status === "ok") { adminKey.set(r.key); pass(); }
+                else if (r.status === "no" || r.status === "gone") { clearInterval(poll); gm.textContent = r.status === "no" ? "요청이 거절됐어요." : "요청이 만료됐어요. 다시 요청해 주세요."; e.target.disabled = false; }
+              } catch {}
+            }, 2000);
+          } catch { gm.textContent = "요청을 보내지 못했어요."; }
+        }
+      });
+    }
     fill(); check();
     showForm.fill = () => { fill(); check(); };
   }
@@ -414,10 +466,10 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
           <header class="mob-head">
             <img class="mob-av" src="${avatarURL(id, 2)}" alt="">
             <div class="who"><b class="${d.style.gender}">${esc(d.name)} 님</b><small class="mob-live">${sub}</small></div>
-            ${id === ADMIN_ID && onController ? `<button class="btn ctl-btn" data-act="ctl">🎮</button>` : ""}
+            ${isAdmin(id) && onController ? `<button class="btn ctl-btn" data-act="ctl">🎮</button>` : ""}
             <button class="btn sub" data-act="edit">캐릭터 수정</button>
           </header>
-          ${id === ADMIN_ID ? `<div class="mob-admin"><button class="btn sub" data-act="adminrand">🎲 랜덤 5명 입장</button><button class="btn sub" data-act="wipe">💥 광장 초기화</button><button class="btn sub" data-act="office">🏢 사옥⇄광장</button><button class="btn sub" data-act="reload">🔄 새로고침</button><button class="btn sub" data-act="cheersall">🍻 다같이 건배</button><button class="btn sub" data-act="mplay">▶️ 음악 재생</button><button class="btn sub" data-act="mpause">⏸ 음악 정지</button></div>` : ""}
+          ${isAdmin(id) ? `<div class="mob-admin"><button class="btn sub" data-act="adminrand">🎲 랜덤 5명 입장</button><button class="btn sub" data-act="wipe">💥 광장 초기화</button><button class="btn sub" data-act="office">🏢 사옥⇄광장</button><button class="btn sub" data-act="reload">🔄 새로고침</button><button class="btn sub" data-act="cheersall">🍻 다같이 건배</button><button class="btn sub" data-act="mplay">▶️ 음악 재생</button><button class="btn sub" data-act="mpause">⏸ 음악 정지</button></div>` : ""}
           <div class="mob-quiz" hidden></div>
           <ul class="mob-chat"></ul>
           <div class="mob-emo">${EMOTES.map(([k, e, l]) => `<button type="button" data-emo="${k}"><i>${e}</i>${l}</button>`).join("")}</div>
@@ -477,7 +529,7 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
         const act = e.target.closest("[data-act]")?.dataset.act;
         if (act === "ctl") { onController(); return; }
         // 관리자 버튼은 관리자 화면에서만(꾸미기의 🎲 랜덤과 이름이 겹쳐 사고 났던 적 있음)
-        if (["adminrand", "wipe", "office", "cheersall", "mplay", "mpause", "reload"].includes(act) && id !== ADMIN_ID) return;
+        if (["adminrand", "wipe", "office", "cheersall", "mplay", "mpause", "reload"].includes(act) && !isAdmin(id)) return;
         if (act === "adminrand") { adminRandom(entries); return; }
         if (act === "wipe") { adminWipe(id); return; }
         if (act === "office") { adminSignal("/api/office", { toggle: true }); return; }

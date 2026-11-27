@@ -55,7 +55,8 @@ export class Room extends DurableObject {
     this.show = null;
     this.mode = null;
     this.quizQs = []; this.quiz = null; this.votes = new Map();
-    ctx.blockConcurrencyWhile(async () => { this.show = (await ctx.storage.get("show")) || null; this.mode = (await ctx.storage.get("mode")) || null; this.quizQs = (await ctx.storage.get("quizQs")) || []; this.quiz = (await ctx.storage.get("quiz")) || null; this.office = !!(await ctx.storage.get("office")); });
+    ctx.blockConcurrencyWhile(async () => { this.show = (await ctx.storage.get("show")) || null; this.mode = (await ctx.storage.get("mode")) || null; this.quizQs = (await ctx.storage.get("quizQs")) || []; this.quiz = (await ctx.storage.get("quiz")) || null; this.office = !!(await ctx.storage.get("office")); this.admins = (await ctx.storage.get("admins")) || null; });
+    this.reqs = new Map(); this.reqN = 0;
   }
   menus() {
     return this.ctx.storage.sql.exec("SELECT sid, name, title, sub, people, at, extra FROM menus ORDER BY sid").toArray().map(({ extra, ...m }) => ({ kind: "merit", ...JSON.parse(extra || "{}"), ...m, people: JSON.parse(m.people || "[]") }));
@@ -84,6 +85,7 @@ export class Room extends DurableObject {
       server.send(JSON.stringify({ type: "show", show: this.show }));
       server.send(JSON.stringify({ type: "mode", mode: this.mode }));
       server.send(JSON.stringify({ type: "office", on: this.office }));
+      server.send(JSON.stringify({ type: "admins", ids: this.admins }));
       server.send(JSON.stringify({ type: "quiz", quiz: this.quiz, votes: Object.fromEntries(this.votes) }));
       return new Response(null, { status: 101, webSocket: client });
     }
@@ -176,6 +178,40 @@ export class Room extends DurableObject {
       this.votes.set(id, pick);
       this.broadcast({ type: "vote", id, pick, idx: this.quiz.idx });
       return json(req, { ok: true });
+    }
+    // 관리자 권한 요청(누구나): 관리자로 지정된 이름으로 입장하려는데 비밀번호를 모를 때
+    if (path === "/api/admin/request") {
+      const id = Number(body.id);
+      if (!Number.isInteger(id) || id < 0 || id >= MAX) return json(req, { error: "bad id" }, 400);
+      for (const [k, r] of this.reqs) if (Date.now() - r.at > 30 * 60000) this.reqs.delete(k);
+      if (this.reqs.size > 50) return json(req, { error: "busy" }, 429);
+      const rid = Math.random().toString(36).slice(2, 10) + (++this.reqN);
+      this.reqs.set(rid, { rid, id, at: Date.now(), status: "wait" });
+      this.broadcast({ type: "adminreq" });
+      return json(req, { ok: true, rid });
+    }
+    if (path === "/api/admin/status") {
+      const r = this.reqs.get(String(body.rid || ""));
+      if (!r) return json(req, { status: "gone" });
+      return json(req, r.status === "ok" ? { status: "ok", key: this.env.ADMIN_KEY } : { status: r.status });
+    }
+    if (path.startsWith("/api/admin/")) {
+      if (!this.admin(req)) return json(req, { error: "forbidden" }, 403);
+      if (path === "/api/admin/check") return json(req, { ok: true });
+      if (path === "/api/admin/list") return json(req, { ok: true, admins: this.admins, reqs: [...this.reqs.values()].filter((r) => r.status === "wait") });
+      if (path === "/api/admin/set") {
+        this.admins = (Array.isArray(body.ids) ? body.ids : []).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < MAX).slice(0, 30);
+        await this.ctx.storage.put("admins", this.admins);
+        this.broadcast({ type: "admins", ids: this.admins });
+        return json(req, { ok: true, admins: this.admins });
+      }
+      if (path === "/api/admin/decide") {
+        const r = this.reqs.get(String(body.rid || "")); if (!r) return json(req, { error: "gone" }, 404);
+        r.status = body.ok ? "ok" : "no";
+        if (body.ok && Array.isArray(this.admins) && !this.admins.includes(r.id)) { this.admins.push(r.id); await this.ctx.storage.put("admins", this.admins); this.broadcast({ type: "admins", ids: this.admins }); }
+        return json(req, { ok: true });
+      }
+      return json(req, { error: "not found" }, 404);
     }
     if (path.startsWith("/api/menu") || path === "/api/show" || path === "/api/mode" || path === "/api/office" || path === "/api/reload" || path === "/api/music" || path.startsWith("/api/quiz")) {
       if (!this.admin(req)) return json(req, { error: "forbidden" }, 403);
