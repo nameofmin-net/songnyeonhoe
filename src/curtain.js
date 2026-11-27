@@ -20,48 +20,57 @@ export function createCurtain(canvas) {
   }
   const settled = () => Math.abs(top.x - target) < 0.004 && Math.abs(top.v) < 0.01 && Math.abs(hem.x - target) < 0.006 && Math.abs(hem.v) < 0.02;
 
-  function shade(b) {
-    // 벨벳 빨강 램프
-    const r = Math.round(60 + 175 * b), gg = Math.round(6 + 38 * b * b), bb = Math.round(14 + 40 * b * b);
-    return `rgb(${r},${gg},${bb})`;
-  }
-  function drawHalf(side) {
+  // 픽셀 버퍼에 직접 칠하고 한 번에 올린다(칸마다 fillRect + 색 문자열 해석하던 것보다 훨씬 가벼움)
+  const img = g.createImageData(LW, LH), buf = new Uint32Array(img.data.buffer);
+  const pack = (r, gg, bb) => (255 << 24) | (bb << 16) | (gg << 8) | r;
+  // 벨벳 빨강 램프(밝기 0~1을 256단계로 미리 계산)
+  const LUT = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) { const v = i / 255; LUT[i] = pack(Math.round(60 + 175 * v), Math.round(6 + 38 * v * v), Math.round(14 + 40 * v * v)); }
+  const GOLD = pack(0xff, 0xd8, 0x4a), GOLD2 = pack(0xc8, 0x94, 0x1a), GOLD3 = pack(0xa8, 0x74, 0x1a);
+  const COLS = 64, cosP = new Float32Array(COLS);
+  for (let i = 0; i < COLS; i++) cosP[i] = (i / COLS) * PLEATS * Math.PI * 2;
+  const span = (x0, x1, y, c) => { x0 = Math.max(0, x0); x1 = Math.min(LW, x1); const o = y * LW; for (let x = x0; x < x1; x++) buf[o + x] = c; };
+  const darken = (x0, x1, y) => { x0 = Math.max(0, x0); x1 = Math.min(LW, x1); const o = y * LW; for (let x = x0; x < x1; x++) { const v = buf[o + x]; if (!v) continue; buf[o + x] = (255 << 24) | ((((v >> 16) & 255) * 0.75) << 16) | ((((v >> 8) & 255) * 0.75) << 8) | ((v & 255) * 0.75); } };
+  function drawHalf(side, shift) {
     // side -1: 왼쪽(바깥=0), +1: 오른쪽(바깥=LW)
+    const sh = Math.round(side * shift), wob = 0.6 * (1 - settledness());
     for (let y = 0; y < LH; y++) {
       const fy = y / LH, o = top.x + (hem.x - top.x) * fy * fy; // 아래로 갈수록 밑단 값을 따름
       const width = Math.max(10, HALF * (1 - 0.88 * Math.min(1, Math.max(-0.05, o))));
       // 움직일 때 천이 부풀어 출렁
-      const billow = (top.v - hem.v) * 6 * Math.sin(fy * Math.PI) + Math.sin(t * 1.3 + fy * 5) * 0.6 * (1 - settledness());
-      const cols = 64;
-      for (let i = 0; i < cols; i++) {
-        const u0 = i / cols, u1 = (i + 1) / cols;
+      const billow = (top.v - hem.v) * 6 * Math.sin(fy * Math.PI) + Math.sin(t * 1.3 + fy * 5) * wob;
+      const dark = 0.78 + 0.22 * (1 - fy), f2 = fy * 2, gold = Math.floor(y / 3) % 2 ? GOLD : GOLD2;
+      for (let i = 0; i < COLS; i++) {
+        const u0 = i / COLS, u1 = (i + 1) / COLS;
         const xa = u0 * width + billow * u0, xb = u1 * width + billow * u1;
-        const ph = u0 * PLEATS * Math.PI * 2;
-        let b = 0.55 + 0.38 * Math.cos(ph) + 0.07 * Math.cos(ph * 2 + fy * 2);
-        b *= 0.78 + 0.22 * (1 - fy) ; // 아래쪽은 살짝 어둡게
-        if (u0 > 0.965) b = 1.35; // 안쪽 금색 단(아래에서 별도로 칠함)
+        let c;
+        if (u0 > 0.965) c = gold;
+        else { const ph = cosP[i]; let bv = (0.55 + 0.38 * Math.cos(ph) + 0.07 * Math.cos(ph * 2 + f2)) * dark; c = LUT[Math.round(Math.max(0, Math.min(1, bv)) * 255)]; }
         const x0 = side < 0 ? xa : LW - xb, w = Math.max(1, Math.abs(xb - xa) + 0.6);
-        g.fillStyle = u0 > 0.965 ? (Math.floor(y / 3) % 2 ? "#ffd84a" : "#c8941a") : shade(Math.max(0, Math.min(1, b)));
-        g.fillRect(Math.floor(x0), y, Math.ceil(w), 1);
+        const px = Math.floor(x0) + sh; span(px, px + Math.ceil(w), y, c);
       }
       // 안쪽 가장자리 그림자
-      const ex = side < 0 ? width + billow : LW - width - billow;
-      g.fillStyle = "rgba(0,0,0,0.25)"; g.fillRect(Math.floor(side < 0 ? ex : ex - 3), y, 3, 1);
+      const ex = Math.floor(side < 0 ? width + billow : LW - width - billow - 3) + sh;
+      darken(ex, ex + 3, y);
     }
     // 밑단 술(펄럭이는 금색 점선)
     const o = hem.x, width = Math.max(10, HALF * (1 - 0.88 * Math.min(1, Math.max(-0.05, o))));
-    for (let x = 0; x < width; x += 2) { g.fillStyle = (x / 2) % 2 ? "#ffd84a" : "#a8741a"; g.fillRect(side < 0 ? x : LW - x - 2, LH - 2, 2, 2); }
+    for (let x = 0; x < width; x += 2) { const c = (x / 2) % 2 ? GOLD : GOLD3, px = (side < 0 ? x : LW - x - 2) + sh; span(px, px + 2, LH - 2, c); span(px, px + 2, LH - 1, c); }
   }
   let settle = 0;
   const settledness = () => settle;
+  // ?fps=30 이면 커튼도 같은 프레임으로
+  const CAP = typeof location !== "undefined" ? +new URLSearchParams(location.search).get("fps") || 0 : 0;
   function frame(ms) {
+    if (CAP && last && ms - last < 1000 / CAP - 3) { raf = requestAnimationFrame(frame); return; }
     const dt = Math.min(0.033, (ms - (last || ms)) / 1000); last = ms; t += dt;
     for (let i = 0; i < 4; i++) step(dt / 4);
     settle = settled() ? Math.min(1, settle + dt) : 0;
-    g.clearRect(0, 0, LW, LH);
     // 다 모인 뒤에도 계속 바깥으로 밀려 나가 화면에서 사라진다
     const shift = Math.max(0, Math.min(top.x, hem.x) - 1) / (OPEN - 1) * (HALF * 0.12 + 24);
-    if (!(target === OPEN && settled())) for (const sd of [-1, 1]) { g.save(); g.translate(sd * shift, 0); drawHalf(sd); g.restore(); }
+    buf.fill(0);
+    if (!(target === OPEN && settled())) for (const sd of [-1, 1]) drawHalf(sd, shift);
+    g.putImageData(img, 0, 0);
     if (settled()) {
       waiters.forEach((f) => f()); waiters = [];
       raf = 0; last = 0;
@@ -80,5 +89,7 @@ export function createCurtain(canvas) {
     open: () => go(OPEN),
     /** 거의 닫혔는지(내용 교체 타이밍) */
     get closedEnough() { return top.x < 0.06; },
+    /** 화면을 완전히 덮고 있는지(이때는 뒤 광장을 안 그려도 됨) */
+    get covers() { return target === 0 && Math.max(top.x, hem.x) < 0.02; },
   };
 }

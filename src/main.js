@@ -797,6 +797,8 @@ function tick(nowMs) {
     }
   }
   for (const it of items) if (it.r) it.r.drawFront();
+  // 커튼이 화면을 다 덮고 있으면 광장 그리기는 쉰다(캐릭터 움직임은 계속)
+  if (curtain?.covers) { requestAnimationFrame(tick); return; }
   drawTreeFx(dt);
   drawDust(dt);
   if (!Q && !officeOn) drawSnow(dt, now);
