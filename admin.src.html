@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>관리자 지정</title>
+<title>송년회 관리자</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css">
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; min-height: 100%; background: #110d18; color: #f4eefc; font-family: Galmuri14, "Apple SD Gothic Neo", sans-serif; }
-  body { display: flex; justify-content: center; padding: 24px 16px 40px; }
+  .back { position: fixed; left: 12px; top: 10px; font-size: 12px; color: #9a90b0; text-decoration: none; }
+  body { display: flex; justify-content: center; padding: 40px 16px 40px; }
   .card { width: min(460px, 100%); background: #1a1426; border: 3px solid #3a2f52; box-shadow: 0 0 0 3px #1c1624; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
   h1 { margin: 0 0 4px; font-size: 20px; color: #ffd84a; }
   h2 { margin: 14px 0 0; font-size: 15px; } h2 b { color: #1c1624; background: #ff5a6a; padding: 0 6px; font-size: 12px; }
@@ -30,10 +31,14 @@
   .list li span { flex: 1; font-size: 15px; } .list li small { margin-left: 6px; font-size: 11px; color: #9a90b0; }
   .list li em { font-style: normal; font-size: 11px; color: #9a90b0; }
   .list li.empty { justify-content: center; color: #7a7090; font-size: 13px; padding: 10px; }
+  .ctl { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .ctl .btn { padding: 12px 6px; font-size: 14px; }
+  .ctl-msg { font-size: 13px; color: #7fe0a0; min-height: 1.2em; }
   #reqs li:not(.empty) { border-color: #ffd84a; }
 </style>
 </head>
 <body>
+  <a class="back" href="join.html">← 입장 화면으로</a>
   <div id="app"></div>
   <script type="module">/*BUNDLE*/</script>
 </body>

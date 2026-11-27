@@ -242,6 +242,7 @@ button:disabled { opacity: .45; filter: grayscale(.6); cursor: default; }
 .mob-admin { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px 10px; border-bottom: 1px solid #ffffff14; }
 .mob-admin .btn { flex: 1; padding: 8px 6px; font-size: 13px; }
 .mob-head .btn.ctl-btn { padding: 6px 10px; font-size: 20px; }
+a.ctl-btn { text-decoration: none; display: inline-block; line-height: 1.2; }
 .mob-chat { flex: 1; overflow-y: auto; padding: 8px 10px; list-style: none; margin: 0; }
 .mob-chat .empty { color: #7a7090; text-align: center; padding: 40px 10px; font-size: 13px; line-height: 1.6; }
 .mob-emo { display: flex; gap: 6px; overflow-x: auto; padding: 8px 10px 0; background: #1a1426; border-top: 2px solid #3a2f52; flex: none; scrollbar-width: none; }
@@ -266,7 +267,7 @@ button:disabled { opacity: .45; filter: grayscale(.6); cursor: default; }
 `;
 let cssOn = false;
 const ME_KEY = "songnyeonhoe-me-v1";
-const readMe = () => { try { const v = localStorage.getItem(ME_KEY); return v === null ? null : +v; } catch { return null; } };
+export const readMe = () => { try { const v = localStorage.getItem(ME_KEY); return v === null ? null : +v; } catch { return null; } };
 const writeMe = (id) => { try { id === null ? localStorage.removeItem(ME_KEY) : localStorage.setItem(ME_KEY, String(id)); } catch {} };
 
 // 복장 항목: [키, 이름, 종류]
@@ -466,10 +467,9 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
           <header class="mob-head">
             <img class="mob-av" src="${avatarURL(id, 2)}" alt="">
             <div class="who"><b class="${d.style.gender}">${esc(d.name)} 님</b><small class="mob-live">${sub}</small></div>
-            ${isAdmin(id) && onController ? `<button class="btn ctl-btn" data-act="ctl">🎮</button>` : ""}
+            ${isAdmin(id) && onController ? `<button class="btn ctl-btn" data-act="ctl">🎮</button>` : ""}${isAdmin(id) ? `<a class="btn ctl-btn" href="admin.html" aria-label="관리자 설정">⚙️</a>` : ""}
             <button class="btn sub" data-act="edit">캐릭터 수정</button>
           </header>
-          ${isAdmin(id) ? `<div class="mob-admin"><button class="btn sub" data-act="adminrand">🎲 랜덤 5명 입장</button><button class="btn sub" data-act="wipe">💥 광장 초기화</button><button class="btn sub" data-act="office">🏢 사옥⇄광장</button><button class="btn sub" data-act="reload">🔄 새로고침</button><button class="btn sub" data-act="cheersall">🍻 다같이 건배</button><button class="btn sub" data-act="mplay">▶️ 음악 재생</button><button class="btn sub" data-act="mpause">⏸ 음악 정지</button></div>` : ""}
           <div class="mob-quiz" hidden></div>
           <ul class="mob-chat"></ul>
           <div class="mob-emo">${EMOTES.map(([k, e, l]) => `<button type="button" data-emo="${k}"><i>${e}</i>${l}</button>`).join("")}</div>
@@ -643,7 +643,7 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
 }
 
 const RAND_MSG = ["올해 정말 고생 많으셨어요!", "내년에도 잘 부탁드립니다 🙏", "다들 건강하세요!", "올해 최고의 팀이었어요 👏", "새해 복 많이 받으세요", "맛있는 거 먹으러 왔어요 🍗", "내년엔 더 재밌게!", "올 한 해 감사했습니다", "회식 2차 갑니다 🍻", "다들 사랑합니다 ❤️"];
-function adminRandom(entries, n = 5) {
+export function adminRandom(entries, n = 5) {
   const here = entries?.() || new Map(), has = (i) => (here.has ? here.has(i) : here[i]);
   const waiting = ALL.filter((d) => !d.guest).map((d) => d.id).filter((i) => !has(i));
   if (!waiting.length) { alert("모두 입장했어요."); return; }
@@ -652,7 +652,7 @@ function adminRandom(entries, n = 5) {
     setTimeout(() => sendJoin(pick, RAND_MSG[Math.floor(Math.random() * RAND_MSG.length)]).catch(() => {}), i * 600);
   }
 }
-async function adminWipe(me) {
+export async function adminWipe(me) {
   if (!confirm("💥 광장을 초기화할까요?\n모든 기기의 입장 명단과 채팅이 지워져요. (관리자 본인은 남아요)")) return;
   let key = adminKey.get();
   if (!key) { key = (prompt("관리자 코드를 입력하세요.") || "").trim(); if (!key) return; }
@@ -678,7 +678,7 @@ if (typeof document !== "undefined") {
   document.addEventListener("pointermove", (e) => { if (!held) return; const r = held.getBoundingClientRect(); if (e.clientX < r.left - 8 || e.clientX > r.right + 8 || e.clientY < r.top - 8 || e.clientY > r.bottom + 8) { held.classList.remove("down"); held = null; } }, true);
 }
 
-async function adminSignal(path, body) {
+export async function adminSignal(path, body) {
   let key = adminKey.get();
   if (!key) { key = (prompt("관리자 코드를 입력하세요.") || "").trim(); if (!key) return; adminKey.set(key); }
   try { await adminPost(path, body); } catch (e) { if (e.message === "forbidden") adminKey.set(""); alert(e.message === "forbidden" ? "관리자 코드가 맞지 않아요." : "전송에 실패했어요."); }
