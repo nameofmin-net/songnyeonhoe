@@ -134,7 +134,7 @@ const CSS = `
 .jf .hits button em { margin-left: auto; font-style: normal; font-size: 11px; color: #9a90b0; }
 .jf .hits .rk { font-size: 11px; color: #9a90b0; }
 .jf .hits .direct { justify-content: center; color: #1c1624; background: #ffd84a; border-color: #fff3b0; padding: 10px; }
-.jf .hits .none { font-size: 12px; color: #9a90b0; padding: 4px 2px; }
+.jf .hits .none { font-size: 13px; line-height: 1.5; color: #c9c0dc; padding: 6px 2px; }
 .jf .gst-row { display: flex; align-items: center; gap: 6px; font-size: 13px; flex-wrap: wrap; }
 .jf .gst-nm { color: #ffd84a; font-size: 15px; margin-right: auto; }
 .jf .gsx { font: inherit; font-size: 13px; padding: 6px 12px; color: #f4eefc; background: #221a36; border: 2px solid #4a3f6a; cursor: pointer; }
@@ -319,8 +319,8 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
       if (!t) { hits.innerHTML = ""; return; }
       const ids = sortedByName(ALL.filter((d) => !d.guest ? d.name.includes(t) : E.has(d.id) && d.name.includes(t)).map((d) => d.id)).slice(0, 8);
       hits.innerHTML = ids.map((id) => `<li><button type="button" data-id="${id}"><img alt="" src="${avatarURL(id, 2, true)}"><span>${esc(ALL[id].name)}</span>${ALL[id].rank ? `<small class="rk">${ALL[id].rank}</small>` : ""}${E.has(id) ? `<em>입장 완료</em>` : ""}</button></li>`).join("") +
-        (ids.length ? "" : `<li class="none">“${esc(t)}” 님을 명단에서 못 찾았어요</li>`) +
-        (t.length >= 2 && !ids.some((id) => ALL[id].name === t) ? `<li><button type="button" class="direct" data-act="direct">✏️ “${esc(t)}” 이름으로 직접 입력</button></li>` : "");
+        (ids.length ? "" : `<li class="none">앗, “${esc(t)}” 님이 명단에 없네요.<br>저희가 미처 챙기지 못했어요, 죄송해요 🙏</li>` +
+          (t.length >= 2 ? `<li><button type="button" class="direct" data-act="direct">✏️ “${esc(t)}” 이름으로 입장하기</button></li>` : `<li class="none">이름을 끝까지 입력해 주세요</li>`));
     };
     const check = () => {
       const id = pickId, done = id !== null && entries().has(id);
