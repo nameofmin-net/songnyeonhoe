@@ -411,7 +411,7 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
             ${id === ADMIN_ID && onController ? `<button class="btn ctl-btn" data-act="ctl">🎮</button>` : ""}
             <button class="btn sub" data-act="edit">캐릭터 수정</button>
           </header>
-          ${id === ADMIN_ID ? `<div class="mob-admin"><button class="btn sub" data-act="rand">🎲 랜덤 5명 입장</button><button class="btn sub" data-act="wipe">💥 광장 초기화</button><button class="btn sub" data-act="office">🏢 사옥⇄광장</button><button class="btn sub" data-act="reload">🔄 새로고침</button><button class="btn sub" data-act="cheersall">🍻 다같이 건배</button><button class="btn sub" data-act="mplay">▶️ 음악 재생</button><button class="btn sub" data-act="mpause">⏸ 음악 정지</button></div>` : ""}
+          ${id === ADMIN_ID ? `<div class="mob-admin"><button class="btn sub" data-act="adminrand">🎲 랜덤 5명 입장</button><button class="btn sub" data-act="wipe">💥 광장 초기화</button><button class="btn sub" data-act="office">🏢 사옥⇄광장</button><button class="btn sub" data-act="reload">🔄 새로고침</button><button class="btn sub" data-act="cheersall">🍻 다같이 건배</button><button class="btn sub" data-act="mplay">▶️ 음악 재생</button><button class="btn sub" data-act="mpause">⏸ 음악 정지</button></div>` : ""}
           <div class="mob-quiz" hidden></div>
           <ul class="mob-chat"></ul>
           <div class="mob-emo">${EMOTES.map(([k, e, l]) => `<button type="button" data-emo="${k}"><i>${e}</i>${l}</button>`).join("")}</div>
@@ -470,7 +470,9 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
       root.querySelector(".mob").addEventListener("click", (e) => {
         const act = e.target.closest("[data-act]")?.dataset.act;
         if (act === "ctl") { onController(); return; }
-        if (act === "rand") { adminRandom(entries); return; }
+        // 관리자 버튼은 관리자 화면에서만(꾸미기의 🎲 랜덤과 이름이 겹쳐 사고 났던 적 있음)
+        if (["adminrand", "wipe", "office", "cheersall", "mplay", "mpause", "reload"].includes(act) && id !== ADMIN_ID) return;
+        if (act === "adminrand") { adminRandom(entries); return; }
         if (act === "wipe") { adminWipe(id); return; }
         if (act === "office") { adminSignal("/api/office", { toggle: true }); return; }
         if (act === "cheersall") { sendCheers().catch(() => {}); return; }
