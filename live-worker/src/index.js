@@ -27,7 +27,7 @@ export default {
 };
 
 // 복장 설정: 정해진 항목만, 짧은 영문 키워드나 #rrggbb 색만 허용
-const EMOTES = ["cheers", "wave", "heart", "party", "dance", "laugh", "wow", "sleepy"];
+const EMOTES = ["cheers", "wave", "heart", "party", "dance", "laugh", "wow", "sleepy", "focus"];
 const STYLE_KEYS = ["skin", "hair", "hairColor", "top", "topColor", "top2", "bottom", "bottomColor", "shoes", "hat", "hatColor", "acc", "accColor", "sp"];
 function cleanStyle(v) {
   const out = {};
@@ -153,6 +153,7 @@ export class Room extends DurableObject {
       if (!this.ctx.storage.sql.exec("SELECT id FROM att WHERE id = ?", who).toArray().length) return json(req, { error: "not joined" }, 403);
       const now = Date.now(), key = "e" + who, last = this.lastChat.get(key) || 0;
       if (now - last < 900) return json(req, { error: "slow down" }, 429);
+      if (kind === "focus") { const lf = this.lastChat.get("f" + who) || 0; if (now - lf < 8000) return json(req, { error: "slow down" }, 429); this.lastChat.set("f" + who, now); }
       this.lastChat.set(key, now);
       this.broadcast({ type: "emote", who, kind, at: now });
       return json(req, { ok: true });

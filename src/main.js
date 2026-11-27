@@ -295,6 +295,12 @@ class Resident {
   update(dt, now) {
     this.t += dt; this.chatCool -= dt;
     if (this.hop > 0) this.hop -= dt;
+    // 관종 모드에 밀려나는 중
+    if (this.shove > 0) {
+      this.shove -= dt; const k = Math.min(1, this.shove / 0.5);
+      const nx = this.x + this.kx * k * dt, ny = this.y + this.ky * k * dt;
+      if (!blocked(nx, ny)) { this.x = nx; this.y = ny; } else this.shove = 0;
+    }
     if (this.swap && this.t >= this.swap.at) { this.setStyle(this.swap.st); this.swap = null; }
     if (this.dance > 0) { this.dance -= dt; this.dir = [0, 2, 1, 2][Math.floor(this.t * 5) % 4]; this.flip = Math.floor(this.t * 5) % 4 === 3; if (this.dance <= 0) { this.dir = 0; this.flip = false; } }
     for (const f of this.fx) {
@@ -411,6 +417,7 @@ class Resident {
     else if (kind === "laugh") { this.say("ㅋㅋㅋㅋㅋ", 2.2); this.pop("sweat"); this.hop = 0.9; hold(1.6); }
     else if (kind === "wow") { this.play(exclamation, false); hold(1.4); }
     else if (kind === "sleepy") { this.play(sleep, true, 3.2); hold(3.2); }
+    else if (kind === "focus") { this.say("집중!!! 📢", 2.8); this.hop = 0.9; this.play(confetti, false); hold(2.4); focusBlast(this); }
   }
   /** 복장 변경: 변신 이펙트를 틀고, 섬광이 가장 밝을 때 새 옷으로 바꾼다 */
   transformTo(st) {
@@ -1022,6 +1029,21 @@ ov.addEventListener("pointerdown", (e) => {
   for (const r of people) { const d = Math.hypot(r.x - x, r.y - 12 - y); if (d < 16 && d < bd) { bd = d; best = r; } }
   if (best) { best.react(); sfx.blip(); }
 });
+// 관종 모드: 내 주변 사람들이 충격파에 우르르 밀려난다
+function focusBlast(me) {
+  sfx.boom?.();
+  const R = 70;
+  for (let i = 0; i < 48; i++) { const a = (i / 48) * Math.PI * 2; tree.dust.push({ x: me.x + Math.cos(a) * 6, y: me.y + Math.sin(a) * 3, vx: Math.cos(a) * 150, vy: Math.sin(a) * 75, c: C(i % 2 ? "#ffd84a" : "#fff3c0"), ash: C("#e8d6b0"), life: 0.5, t: 0, sp: true }); }
+  for (const r of people) {
+    if (r === me || r.hidden || r.seat || r.state === "ride" || r.entering !== undefined) continue;
+    const dx = r.x - me.x, dy = (r.y - me.y) * 1.6, d = Math.hypot(dx, dy);
+    if (d > R) continue;
+    const ux = d < 1 ? (Math.random() - 0.5) : dx / d, uy = d < 1 ? (Math.random() - 0.5) : dy / d / 1.6, f = 260 * (1 - d / R * 0.6);
+    r.kx = ux * f; r.ky = uy * f; r.shove = 0.5; r.hop = 0.6;
+    r.state = "idle"; r.pending = null; r.timer = Math.max(r.timer, 1.4); r.dir = 0; r.flip = ux < 0;
+    setTimeout(() => { if (!r.hidden) { r.play(stunned, true, 1.2); if (Math.random() < 0.5) r.say(choose(["으악!", "왜 밀어요 😵", "헉", "네 집중!!", "관종이다 ㅋㅋ", "아이고"]), 1.8); } }, 120 + Math.random() * 200);
+  }
+}
 function cheersAll() {
   for (const r of people) setTimeout(() => r.emote("cheers"), Math.random() * 700);
 }
@@ -1069,7 +1091,7 @@ function onEmote(m) {
   chatItems.push(m); if (chatItems.length > 150) chatItems.shift();
   renderChat();
   people.find((p) => p.d.id === m.who)?.emote(m.kind);
-  if (m.kind !== "cheers") sfx.blip();
+  if (m.kind !== "cheers" && m.kind !== "focus") sfx.blip();
 }
 function onChat(m) {
   chatItems.push(m); if (chatItems.length > 150) chatItems.shift();

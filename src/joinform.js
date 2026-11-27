@@ -35,7 +35,7 @@ export const sendEmote = (id, kind) => post("/api/emote", { id, kind });
 /** 채팅 이모티콘: 누르면 광장의 내 캐릭터가 그 동작을 한다 */
 export const EMOTES = [
   ["cheers", "🍻", "건배"], ["wave", "👋", "인사"], ["heart", "❤️", "하트"], ["party", "🎉", "축하"],
-  ["dance", "💃", "댄스"], ["laugh", "😂", "웃음"], ["wow", "❗", "놀람"], ["sleepy", "😴", "졸려"],
+  ["dance", "💃", "댄스"], ["laugh", "😂", "웃음"], ["wow", "❗", "놀람"], ["sleepy", "😴", "졸려"], ["focus", "📢", "집중!!"],
 ];
 export const emoteOf = (k) => EMOTES.find((e) => e[0] === k);
 export const resetAll = (key, keep) => post("/api/reset", keep === undefined ? {} : { keep }, { "X-Admin-Key": key });
@@ -411,7 +411,7 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
             ${id === ADMIN_ID && onController ? `<button class="btn ctl-btn" data-act="ctl">🎮</button>` : ""}
             <button class="btn sub" data-act="edit">캐릭터 수정</button>
           </header>
-          ${id === ADMIN_ID ? `<div class="mob-admin"><button class="btn sub" data-act="rand">🎲 랜덤 5명 입장</button><button class="btn sub" data-act="wipe">💥 광장 초기화</button><button class="btn sub" data-act="office">🏢 사옥⇄광장</button><button class="btn sub" data-act="reload">🔄 새로고침</button><button class="btn sub" data-act="mplay">▶️ 음악 재생</button><button class="btn sub" data-act="mpause">⏸ 음악 정지</button></div>` : ""}
+          ${id === ADMIN_ID ? `<div class="mob-admin"><button class="btn sub" data-act="rand">🎲 랜덤 5명 입장</button><button class="btn sub" data-act="wipe">💥 광장 초기화</button><button class="btn sub" data-act="office">🏢 사옥⇄광장</button><button class="btn sub" data-act="reload">🔄 새로고침</button><button class="btn sub" data-act="cheersall">🍻 다같이 건배</button><button class="btn sub" data-act="mplay">▶️ 음악 재생</button><button class="btn sub" data-act="mpause">⏸ 음악 정지</button></div>` : ""}
           <div class="mob-quiz" hidden></div>
           <ul class="mob-chat"></ul>
           <div class="mob-emo">${EMOTES.map(([k, e, l]) => `<button type="button" data-emo="${k}"><i>${e}</i>${l}</button>`).join("")}</div>
@@ -473,6 +473,7 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
         if (act === "rand") { adminRandom(entries); return; }
         if (act === "wipe") { adminWipe(id); return; }
         if (act === "office") { adminSignal("/api/office", { toggle: true }); return; }
+        if (act === "cheersall") { sendCheers().catch(() => {}); return; }
         if (act === "mplay" || act === "mpause") { adminSignal("/api/music", { play: act === "mplay" }); return; }
         if (act === "reload") { if (confirm("🔄 광장 모니터 화면을 새로고침할까요?\n(참가자 휴대폰은 그대로예요)")) adminSignal("/api/reload", {}); return; }
         if (act === "edit") { sheet.hidden = false; sheet.scrollTop = 0; }
