@@ -336,13 +336,19 @@ export function mountEntry(root, { lock = true, entries, onEntered, onController
       cnt.textContent = `${msg.value.length} / 40`;
     };
     const unpick = () => { pickId = null; guest = null; q.value = ""; out.textContent = ""; fill(); check(); q.focus(); };
-    q.addEventListener("input", () => { out.textContent = ""; fill(); });
+    // 한글 입력 중(조합 중)에 목록을 누르면, 키보드가 조합 글자("김")를 뒤늦게 확정하면서 이름을 덮어쓴다 → 고른 이름으로 되돌림
+    const shown = () => (pickId !== null ? ALL[pickId].name : guest ? guest.name : null);
+    const keep = () => { const n = shown(); if (n !== null && q.value !== n) q.value = n; };
+    q.addEventListener("input", () => { if (shown() !== null) return keep(); out.textContent = ""; fill(); });
+    q.addEventListener("compositionend", () => setTimeout(keep, 0));
+    q.addEventListener("blur", () => setTimeout(keep, 0));
     q.addEventListener("click", () => { if (q.readOnly) unpick(); });
     q.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); hits.querySelector("button")?.click(); } });
     hits.addEventListener("click", (e) => {
       const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.act === "direct") { guest = { name: norm(q.value).slice(0, 10), gender: "M" }; q.value = guest.name; }
       else { pickId = +b.dataset.id; q.value = ALL[pickId].name; }
+      q.blur(); [0, 60, 250].forEach((ms) => setTimeout(keep, ms));
       fill(); check(); if (!box.hidden) msg.focus();
     });
     gst.addEventListener("click", (e) => {
